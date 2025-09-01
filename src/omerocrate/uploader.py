@@ -314,3 +314,29 @@ class ApiUploader(OmeroUploader):
                         # Add the image to the dataset
                         dataset._linkObject(wrapper, "DatasetImageLinkI")
                         yield wrapper
+
+
+class SegmentationUploader(ApiUploader):
+    """
+    Subclass of OmeroUploader that also uploads segmentation masks.
+    This class is just a temporary prototype to get this feature working.
+    """
+
+    async def execute(self) -> gateway.DatasetWrapper:
+        """
+        Runs the entire processing workflow.
+        We're overwriting this method to skip group creation for now.
+        """
+        self.connect()
+        img_uris: list[URIRef]
+        img_paths: list[Path]
+
+        # Skip any group creation for now as test user needs the correct permissions
+        group = self.conn.getGroupFromContext()
+        dataset = self.make_dataset(group)
+
+        img_uris, img_paths = list(zip(*self.find_images()))
+        img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
+        for wrapper, uri in zip(img_wrappers, img_uris):
+            self.process_image(uri, wrapper)
+        return dataset
