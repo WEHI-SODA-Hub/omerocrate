@@ -116,7 +116,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
-    
+
     def make_dataset(self, group: gateway.ExperimenterGroupWrapper) -> gateway.DatasetWrapper:
         """
         Creates the OMERO dataset wrapper that corresponds to this crate.
@@ -322,6 +322,23 @@ class SegmentationUploader(ApiUploader):
     This class is just a temporary prototype to get this feature working.
     """
 
+    def find_images_with_segmentation(self) -> Iterable[tuple[Identifier, Path, Path]]:
+        """
+        Finds images containing segmentation masks that should be uploaded to OMERO.
+        Can be overridden to customize the query.
+        """
+        for result in self.select_many("""
+            SELECT ?file_path ?segmentation_file
+            WHERE {
+                ?file_path a schema:MediaObject ;
+                    omerocrate:upload true ;
+                    omerocrate:segmentationFor ?segmentation_file .
+            }
+        """):
+            file_path = result['file_path']
+            segmentation_file = result['segmentation_file']
+            yield file_path, Path(urlparse(file_path).path), Path(urlparse(segmentation_file).path)
+
     async def execute(self) -> gateway.DatasetWrapper:
         """
         Runs the entire processing workflow.
@@ -330,13 +347,16 @@ class SegmentationUploader(ApiUploader):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
+        seg_paths: list[Path]
 
         # Skip any group creation for now as test user needs the correct permissions
         group = self.conn.getGroupFromContext()
         dataset = self.make_dataset(group)
 
-        img_uris, img_paths = list(zip(*self.find_images()))
+        img_uris, img_paths, seg_paths = list(zip(*self.find_images_with_segmentation()))
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri in zip(img_wrappers, img_uris):
+        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
             self.process_image(uri, wrapper)
+            # Handle segmentation upload here
+
         return dataset

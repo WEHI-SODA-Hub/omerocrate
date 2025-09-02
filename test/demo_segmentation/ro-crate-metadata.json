@@ -1,0 +1,40 @@
+{
+    "@context": [
+        "https://w3id.org/ro/crate/1.2-DRAFT/context",
+        {
+            "upload": "https://w3id.org/WEHI-SODA-Hub/omerocrate/upload",
+            "segmentationFor": "https://w3id.org/WEHI-SODA-Hub/omerocrate/segmentationFor",
+            "experimenterGroup": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ExperimenterGroupRef"
+        }
+    ],
+    "@graph": [
+        {
+            "@id": "nuclear_image.tif",
+            "@type": "File",
+            "name": "Nuclear image",
+            "author": "https://isni.org/isni/someid",
+            "upload": true,
+            "segmentationFor": "nuclear_image_segementation.csv"
+        },
+        {
+            "@id": "https://isni.org/isni/someid",
+            "@type": "Person",
+            "name": "TODO"
+        },
+        {
+            "@type": "CreativeWork",
+            "@id": "ro-crate-metadata.json",
+            "about": {
+                "@id": "./"
+            },
+            "conformsTo": {
+                "@id": "https://w3id.org/ro/crate/1.2-DRAFT"
+            }
+        },
+        {
+            "@id": "./",
+            "@type": "Dataset",
+            "name": "Nuclear image"
+        }
+    ]
+}

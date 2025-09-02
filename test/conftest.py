@@ -21,6 +21,10 @@ def ca_imaging_1021(ca_imaging: Path) -> Path:
     return ca_imaging / "ro-crate_1021"
 
 @pytest.fixture
+def nuclear_image() -> Path:
+    return Path(__file__).parent / "demo_segmentation"
+
+@pytest.fixture
 def connection() -> BlitzGateway:
     # To run the tests, each user will need to provide credentials for their own OMERO server
     # .env is a convenient way to store these credentials
