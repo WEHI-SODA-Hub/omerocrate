@@ -12,17 +12,18 @@
             "@id": "nuclear_image.tif",
             "@type": "File",
             "name": "Nuclear image",
-            "author": "https://isni.org/isni/someid",
+            "isBasedOn": "https://github.com/nf-core/test-datasets",
             "upload": true,
             "segmentationFor": "nuclear_image_segementation.csv"
         },
         {
-            "@id": "https://isni.org/isni/someid",
-            "@type": "Person",
-            "name": "TODO"
+            "@id": "https://github.com/nf-core/test-datasets",
+            "@type": ["Dataset", "SoftwareSourceCode"],
+            "name": "nf-core test datasets",
+            "description": "Test datasets for nf-core pipelines"
         },
         {
-            "@type": "CreativeWork",
+            "@type": "MediaObject",
             "@id": "ro-crate-metadata.json",
             "about": {
                 "@id": "./"
