@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 import asyncio
 from pydantic import BaseModel
 import pandas as pd
+from shapely import wkt
+from geopandas import GeoSeries
 
 from omerocrate.utils import user_in_group
 
@@ -347,7 +349,13 @@ class SegmentationUploader(ApiUploader):
         try:
             seg_df = pd.read_csv(segmentation_path, sep=",")
 
-            if 'object' not in seg_df.columns:
+            # Object column can be either 'object' or 'id'
+            object_col = None
+            if 'object' in seg_df.columns:
+                object_col = 'object'
+            elif 'id' in seg_df.columns:
+                object_col = 'id'
+            else:
                 raise ValueError("Missing 'object' column")
 
             # Geometry column can be either 'geometry' or 'polygon'
@@ -359,8 +367,11 @@ class SegmentationUploader(ApiUploader):
             else:
                 raise ValueError("Missing geometry column ('geometry' or 'polygon')")
 
+            # Rename columns for consistency
             if geometry_col == 'polygon':
                 seg_df = seg_df.rename(columns={'polygon': 'geometry'})
+            if object_col == 'id':
+                seg_df = seg_df.rename(columns={'id': 'object'})
 
             if not pd.api.types.is_string_dtype(seg_df['geometry']):
                 seg_df['geometry'] = seg_df['geometry'].astype(str)
@@ -374,13 +385,36 @@ class SegmentationUploader(ApiUploader):
         except Exception as e:
             raise ValueError(f"Error processing segmentation file: {str(e)}")
 
+    def process_shapes(self, seg_df: pd.DataFrame) -> Path:
+        """
+        Can be overridden to customise segmentation uploading.
+        """
+        shapes = GeoSeries(seg_df['geometry'].apply(wkt.loads))
+
+        # TODO: Create a zarr file for labels -- infer data type and create zarr group UUID
+        # TODO: Rasterise the shapes into the zarr file
+
+        return Path()
+
+    def register_mask(self, uri: URIRef, zarr_path: Path) -> int:
+        """
+        Register segmentation mask to OMERO server for the given image URI,
+        using labels stored in the given zarr file path.
+        Returns the ID of the newly created ROI.
+        """
+        # NOTE: label mask needs to be registered using path accessible to the OMERO server
+        return 0
+
     def process_segmentation(self, uri: URIRef, segmentation_path: Path) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
         Can be overridden to customise segmentation processing.
         """
-        # Load segmentation data from csv
         seg_df = self.load_segmentation(segmentation_path)
+        zarr_path = self.process_shapes(seg_df)
+        roi_id = self.register_mask(uri, zarr_path)
+
+        logger.info(f"Registered segmentation ROI with ID {roi_id} for image {uri}")
 
     async def execute(self) -> gateway.DatasetWrapper:
         """
