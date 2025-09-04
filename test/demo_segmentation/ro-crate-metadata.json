@@ -14,7 +14,10 @@
             "name": "Nuclear image",
             "isBasedOn": "https://github.com/nf-core/test-datasets",
             "upload": true,
-            "segmentationFor": "nuclear_image_segementation.csv"
+            "segmentationFor": {
+                "@id": "nuclear_image_segmentation.csv",
+                "@type": "File"
+            }
         },
         {
             "@id": "https://github.com/nf-core/test-datasets",

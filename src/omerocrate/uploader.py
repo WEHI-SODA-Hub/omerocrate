@@ -13,6 +13,7 @@ from omero.rtypes import rstring, rbool
 from urllib.parse import urlparse
 import asyncio
 from pydantic import BaseModel
+import pandas as pd
 
 from omerocrate.utils import user_in_group
 
@@ -339,6 +340,48 @@ class SegmentationUploader(ApiUploader):
             segmentation_file = result['segmentation_file']
             yield file_path, Path(urlparse(file_path).path), Path(urlparse(segmentation_file).path)
 
+    def load_segmentation(self, segmentation_path: Path) -> pd.DataFrame:
+        """
+        Load and validate segmentation CSV file
+        """
+        try:
+            seg_df = pd.read_csv(segmentation_path, sep=",")
+
+            if 'object' not in seg_df.columns:
+                raise ValueError("Missing 'object' column")
+
+            # Geometry column can be either 'geometry' or 'polygon'
+            geometry_col = None
+            if 'geometry' in seg_df.columns:
+                geometry_col = 'geometry'
+            elif 'polygon' in seg_df.columns:
+                geometry_col = 'polygon'
+            else:
+                raise ValueError("Missing geometry column ('geometry' or 'polygon')")
+
+            if geometry_col == 'polygon':
+                seg_df = seg_df.rename(columns={'polygon': 'geometry'})
+
+            if not pd.api.types.is_string_dtype(seg_df['geometry']):
+                seg_df['geometry'] = seg_df['geometry'].astype(str)
+
+            return seg_df
+
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Segmentation file not found: {segmentation_path}")
+        except pd.errors.EmptyDataError:
+            raise ValueError("Segmentation file is empty")
+        except Exception as e:
+            raise ValueError(f"Error processing segmentation file: {str(e)}")
+
+    def process_segmentation(self, uri: URIRef, segmentation_path: Path) -> None:
+        """
+        Load segmentation mask and upload to OMERO for the given image URI.
+        Can be overridden to customise segmentation processing.
+        """
+        # Load segmentation data from csv
+        seg_df = self.load_segmentation(segmentation_path)
+
     async def execute(self) -> gateway.DatasetWrapper:
         """
         Runs the entire processing workflow.
@@ -357,6 +400,6 @@ class SegmentationUploader(ApiUploader):
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
         for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
             self.process_image(uri, wrapper)
-            # Handle segmentation upload here
+            self.process_segmentation(uri, seg)
 
         return dataset
