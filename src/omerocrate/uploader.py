@@ -18,6 +18,7 @@ from shapely import wkt
 from geopandas import GeoSeries
 
 from omerocrate.utils import user_in_group
+from omerocrate.zarr_io import create_zarr
 
 logger = logging.getLogger(__name__)
 
@@ -385,13 +386,15 @@ class SegmentationUploader(ApiUploader):
         except Exception as e:
             raise ValueError(f"Error processing segmentation file: {str(e)}")
 
-    def process_shapes(self, seg_df: pd.DataFrame) -> Path:
+    def process_shapes(self, seg_df: pd.DataFrame, image_path: Path) -> Path:
         """
         Can be overridden to customise segmentation uploading.
         """
+        outfile: Path = self.crate / f"{image_path.stem}.zarr"
+        create_zarr(outfile)
+
         shapes = GeoSeries(seg_df['geometry'].apply(wkt.loads))
 
-        # TODO: Create a zarr file for labels -- infer data type and create zarr group UUID
         # TODO: Rasterise the shapes into the zarr file
 
         return Path()
@@ -405,13 +408,13 @@ class SegmentationUploader(ApiUploader):
         # NOTE: label mask needs to be registered using path accessible to the OMERO server
         return 0
 
-    def process_segmentation(self, uri: URIRef, segmentation_path: Path) -> None:
+    def process_segmentation(self, uri: URIRef, segmentation_path: Path, image_path: Path) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
         Can be overridden to customise segmentation processing.
         """
         seg_df = self.load_segmentation(segmentation_path)
-        zarr_path = self.process_shapes(seg_df)
+        zarr_path = self.process_shapes(seg_df, image_path)
         roi_id = self.register_mask(uri, zarr_path)
 
         logger.info(f"Registered segmentation ROI with ID {roi_id} for image {uri}")
@@ -432,8 +435,8 @@ class SegmentationUploader(ApiUploader):
 
         img_uris, img_paths, seg_paths = list(zip(*self.find_images_with_segmentation()))
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
+        for wrapper, uri, img, seg in zip(img_wrappers, img_uris, img_paths, seg_paths):
             self.process_image(uri, wrapper)
-            self.process_segmentation(uri, seg)
+            self.process_segmentation(uri, seg, img)
 
         return dataset
