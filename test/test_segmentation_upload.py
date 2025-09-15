@@ -3,7 +3,7 @@ import pytest
 from omerocrate.uploader import OmeroUploader, SegmentationUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
-from util import requires_flower
+from util import requires_flower, check_seg_dataset
 
 
 @pytest.mark.parametrize("Uploader", [
@@ -18,4 +18,4 @@ async def test_segmentation_upload(nuclear_image: Path, connection: BlitzGateway
         crate=nuclear_image
     )
     dataset = await uploader.execute()
-    #check_art_dataset(dataset)
+    check_seg_dataset(dataset)
