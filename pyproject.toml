@@ -11,15 +11,11 @@ dependencies = [
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
     # 64b3069 is first added in omero-py 5.19.7
-    "omero-py>=5.19.7",
+    "omero-py>=5.21.1",
     "pydantic>=2.11.3",
     "pyyaml>=6.0.2",
     "rdflib>=7.1.1",
-    "typer>=0.15.2",
-    "pandas>=2.3.2",
-    "shapely>=2.0.7",
-    "geopandas>=1.0.1",
-    "zarr>=2.18.2",
+    "typer>=0.15.2"
 ]
 
 [project.scripts]

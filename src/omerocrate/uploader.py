@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 import logging
 from pathlib import Path
 from time import sleep
@@ -13,12 +14,8 @@ from omero.rtypes import rstring, rbool
 from urllib.parse import urlparse
 import asyncio
 from pydantic import BaseModel
-import pandas as pd
-from shapely import wkt
-from geopandas import GeoSeries
 
 from omerocrate.utils import user_in_group
-from omerocrate.zarr_io import create_zarr
 
 logger = logging.getLogger(__name__)
 
@@ -343,81 +340,64 @@ class SegmentationUploader(ApiUploader):
             segmentation_file = result['segmentation_file']
             yield file_path, Path(urlparse(file_path).path), Path(urlparse(segmentation_file).path)
 
-    def load_segmentation(self, segmentation_path: Path) -> pd.DataFrame:
-        """
-        Load and validate segmentation CSV file
-        """
-        try:
-            seg_df = pd.read_csv(segmentation_path, sep=",")
-
-            # Object column can be either 'object' or 'id'
-            object_col = None
-            if 'object' in seg_df.columns:
-                object_col = 'object'
-            elif 'id' in seg_df.columns:
-                object_col = 'id'
-            else:
-                raise ValueError("Missing 'object' column")
-
-            # Geometry column can be either 'geometry' or 'polygon'
-            geometry_col = None
-            if 'geometry' in seg_df.columns:
-                geometry_col = 'geometry'
-            elif 'polygon' in seg_df.columns:
-                geometry_col = 'polygon'
-            else:
-                raise ValueError("Missing geometry column ('geometry' or 'polygon')")
-
-            # Rename columns for consistency
-            if geometry_col == 'polygon':
-                seg_df = seg_df.rename(columns={'polygon': 'geometry'})
-            if object_col == 'id':
-                seg_df = seg_df.rename(columns={'id': 'object'})
-
-            if not pd.api.types.is_string_dtype(seg_df['geometry']):
-                seg_df['geometry'] = seg_df['geometry'].astype(str)
-
-            return seg_df
-
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Segmentation file not found: {segmentation_path}")
-        except pd.errors.EmptyDataError:
-            raise ValueError("Segmentation file is empty")
-        except Exception as e:
-            raise ValueError(f"Error processing segmentation file: {str(e)}")
-
-    def process_shapes(self, seg_df: pd.DataFrame, image_path: Path) -> Path:
-        """
-        Can be overridden to customise segmentation uploading.
-        """
-        outfile: Path = self.crate / f"{image_path.stem}.zarr"
-        create_zarr(outfile)
-
-        shapes = GeoSeries(seg_df['geometry'].apply(wkt.loads))
-
-        # TODO: Rasterise the shapes into the zarr file
-
-        return Path()
-
-    def register_mask(self, uri: URIRef, zarr_path: Path) -> int:
-        """
-        Register segmentation mask to OMERO server for the given image URI,
-        using labels stored in the given zarr file path.
-        Returns the ID of the newly created ROI.
-        """
-        # NOTE: label mask needs to be registered using path accessible to the OMERO server
-        return 0
-
-    def process_segmentation(self, uri: URIRef, segmentation_path: Path, image_path: Path) -> None:
+    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
-        Can be overridden to customise segmentation processing.
+        By default, uses Glencoe's ROI_Converter_NGFF to parse file, rasterise shapes
+        into a zarr file, and register the mask with OMERO.
+        Can be overridden to utilise an alternative segmentation upload method.
         """
-        seg_df = self.load_segmentation(segmentation_path)
-        zarr_path = self.process_shapes(seg_df, image_path)
-        roi_id = self.register_mask(uri, zarr_path)
+        header: list[str] = []
+        with open(segmentation_path, 'r') as f:
+            header = f.readline().strip().split(',')
 
-        logger.info(f"Registered segmentation ROI with ID {roi_id} for image {uri}")
+        # Check geometry column name
+        geometry_column = None
+        if "polygon" in header:
+            geometry_column = "polygon"
+        elif "geometry" in header:
+            geometry_column = "geometry"
+        if not geometry_column:
+            raise ValueError(
+                f"Segmentation file {segmentation_path} does not contain a "
+                f"'{geometry_column}' or 'polygon' column"
+            )
+
+        from ROI_Converter_NGFF import raster
+        args = {
+            "input_file": str(segmentation_path),
+            "register_to": image.getId(),
+            "name": segmentation_path.stem,
+            "directory": os.getenv("UPLOAD_DIRECTORY", None),
+            "output_filename": None,
+            "width": None,
+            "height": None,
+            "tile_size": 2048,
+            "no_fill": False,
+            "server": os.getenv("OMERO_HOST", "localhost"),
+            "port": os.getenv("OMERO_PORT", "4064"),
+            "user": self.conn.getUser().getName(),
+            "password": os.getenv("OMERO_PASSWORD", ""),
+            "key": None,
+            "series": "0",
+            "label": None,
+            "overwrite": False,
+            "table": False,
+            "column_name": geometry_column,
+            "downsample_type": "vector",
+            "num_objects": None,
+            "no_clean": False,
+            "max_procs": 1,
+            "mode": "local",
+            "db": "postgresql://user:@localhost/table",
+            "debug": True,
+            "server_directory": None,
+            "disable_table_statistics": False,
+            "table_name": None,
+            "offset_x": None,
+            "offset_y": None,
+        }
+        raster.director(args)
 
     async def execute(self) -> gateway.DatasetWrapper:
         """
@@ -435,8 +415,8 @@ class SegmentationUploader(ApiUploader):
 
         img_uris, img_paths, seg_paths = list(zip(*self.find_images_with_segmentation()))
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri, img, seg in zip(img_wrappers, img_uris, img_paths, seg_paths):
+        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
             self.process_image(uri, wrapper)
-            self.process_segmentation(uri, seg, img)
+            self.process_segmentation(seg, wrapper)
 
         return dataset
