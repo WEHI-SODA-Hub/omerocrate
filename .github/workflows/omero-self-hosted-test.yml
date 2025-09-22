@@ -1,0 +1,56 @@
+name: Test with self-hosted OMERO
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    env:
+      OMERO_USER: root
+      OMERO_PASSWORD: omero
+      OMERO_HOST: localhost
+      OMERO_PORT: 4064
+      OMERO_SECURE: true
+
+    runs-on: [ self-hosted, omero-plus-dev ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python with uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.9"
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv pip install https://github.com/glencoesoftware/zeroc-ice-py-linux-x86_64/releases/download/20240202/zeroc_ice-3.6.5-cp39-cp39-manylinux_2_28_x86_64.whl
+        uv sync --all-extras
+
+    - name: Clone OMERO test infrastructure
+      uses: actions/checkout@v4
+      with:
+        repository: ome/omero-test-infra
+        path: .omero
+
+    - name: Start OMERO services
+      # Map the OMERO server port to the same port on the host
+      # Setting in env doesn't seem to work, see https://github.com/ome/omero-test-infra/issues/77
+      run: |
+        echo 'OMERO_SERVER_SSL=4064:' >> .omero/.env
+        .omero/compose up -d
+
+    - name: Wait for OMERO server to be ready
+      run: uv run .omero/wait-on-login
+
+    - name: Run tests
+      run: uv run pytest
+
+    - name: Stop OMERO services
+      run: .omero/compose down

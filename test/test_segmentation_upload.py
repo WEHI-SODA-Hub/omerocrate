@@ -1,11 +1,16 @@
 from pathlib import Path
 import pytest
+import os
 from omerocrate.uploader import OmeroUploader, SegmentationUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
 from util import requires_flower, check_seg_dataset
 
 
+@pytest.mark.skipif(
+    os.getenv("RUNNER_ENVIRONMENT") == "github-hosted",
+    reason="Skip on GitHub-hosted runners due to ROI tool requirement, only run on self-hosted"
+)
 @pytest.mark.parametrize("Uploader", [
     SegmentationUploader,
     pytest.param(TaskqueueUploader, marks=requires_flower)
