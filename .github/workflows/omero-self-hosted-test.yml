@@ -10,8 +10,8 @@ on:
 jobs:
   test:
     env:
-      OMERO_USER: root
-      OMERO_PASSWORD: omero
+      OMERO_USER: ${{ secrets.OMERO_USER }}
+      OMERO_PASSWORD: ${{ secrets.OMERO_PASSWORD }}
       OMERO_HOST: localhost
       OMERO_PORT: 4064
       OMERO_SECURE: true
