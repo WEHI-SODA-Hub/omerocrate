@@ -30,8 +30,8 @@ jobs:
     - name: Install dependencies
       run: |
         uv venv
-        uv pip install https://github.com/glencoesoftware/zeroc-ice-py-linux-x86_64/releases/download/20240202/zeroc_ice-3.6.5-cp39-cp39-manylinux_2_28_x86_64.whl
         uv sync --all-extras
+        uv pip install source /opt/github-runner/ROI_Converter_NGFF-0.7.0-py3-none-any.whl
 
     - name: Run tests
       run: uv run pytest
