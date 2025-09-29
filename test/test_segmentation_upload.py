@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 import os
-from omerocrate.uploader import OmeroUploader, SegmentationUploader
+from omerocrate.uploader import OmeroUploader, ApiUploader, SegmentationUploader, OmeNgffUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
 from util import requires_flower, check_seg_dataset
@@ -12,15 +12,20 @@ from util import requires_flower, check_seg_dataset
     reason="Skip on GitHub-hosted runners due to ROI tool requirement, only run on self-hosted"
 )
 @pytest.mark.parametrize("Uploader", [
-    SegmentationUploader,
+    ApiUploader,
     pytest.param(TaskqueueUploader, marks=requires_flower)
+])
+@pytest.mark.parametrize("SegUploader", [
+    OmeNgffUploader
 ])
 @pytest.mark.asyncio
 async def test_segmentation_upload(nuclear_image: Path, connection: BlitzGateway,
-                                   Uploader: type[OmeroUploader]):
+                                   Uploader: type[OmeroUploader],
+                                   SegUploader: type[SegmentationUploader]):
     uploader = Uploader(
         conn=connection,
-        crate=nuclear_image
+        crate=nuclear_image,
+        segmentation_uploader=SegUploader(conn=connection),
     )
     dataset = await uploader.execute()
     check_seg_dataset(dataset)

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 import os
+import importlib.util
 import logging
 from pathlib import Path
 from time import sleep
-from typing import Any, Iterable, Literal, cast, AsyncIterable
+from typing import Any, Iterable, Union, Literal, cast, AsyncIterable
 from rdflib import Graph, URIRef
 from rdflib.query import ResultRow
 from rdflib.term import Identifier
@@ -22,6 +23,95 @@ logger = logging.getLogger(__name__)
 Namespaces = dict[str, URIRef]
 Variables = dict[str, Identifier]
 
+
+class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
+    """
+    Class that handles uploading of segmentation masks to OMERO.
+    Users can subclass this to customise segmentation upload behavior.
+    """
+    conn: gateway.BlitzGateway
+    "OMERO connection object, typically obtained using [`from_env`][omerocrate.gateway.from_env]"
+
+    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
+        """
+        Load segmentation mask and upload to OMERO for the given image URI.
+        Users should override this method to implement segmentation upload logic.
+        """
+        raise NotImplementedError("process_segmentation() must be implemented in a subclass")
+
+
+class OmeNgffUploader(SegmentationUploader):
+    """
+    Subclass of SegmentationUploader that uses Glencoe's ROI_Converter_NGFF to upload segmentations.
+    Assumes that the segmentation file is a CSV with a 'polygon' or 'geometry' column containing WKT
+    polygons, and an 'object' or 'id' column for object identifiers.
+    Requires ROI_Converter_NGFF to be installed and accessible in the Python environment.
+    """
+
+    def __init__(self, conn: gateway.BlitzGateway):
+        if importlib.util.find_spec("ROI_Converter_NGFF") is None:
+            raise ImportError("ROI_Converter_NGFF is required for OmeNgffUploader.")
+        super().__init__(conn=conn)
+
+    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
+        """
+        Load segmentation mask and upload to OMERO for the given image URI.
+        By default, uses Glencoe's ROI_Converter_NGFF to parse file, rasterise shapes
+        into a zarr file, and register the mask with OMERO.
+        """
+        header: list[str] = []
+        with open(segmentation_path, 'r') as f:
+            header = f.readline().strip().split(',')
+
+        # Check geometry column name
+        geometry_column = None
+        if "polygon" in header:
+            geometry_column = "polygon"
+        elif "geometry" in header:
+            geometry_column = "geometry"
+        if not geometry_column:
+            raise ValueError(
+                f"Segmentation file {segmentation_path} does not contain a "
+                f"'{geometry_column}' or 'polygon' column"
+            )
+
+        from ROI_Converter_NGFF import raster
+        args = {
+            "input_file": str(segmentation_path),
+            "register_to": image.getId(),
+            "name": segmentation_path.stem,
+            "directory": os.getenv("UPLOAD_DIRECTORY", None),
+            "output_filename": None,
+            "width": None,
+            "height": None,
+            "tile_size": 2048,
+            "no_fill": False,
+            "server": self.conn.host,
+            "port": self.conn.port,
+            "user": self.conn.getUser().getName(),
+            "password": None,
+            "key": self.conn.getEventContext().sessionUuid,
+            "series": "0",
+            "label": None,
+            "overwrite": False,
+            "table": False,
+            "column_name": geometry_column,
+            "downsample_type": "vector",
+            "num_objects": None,
+            "no_clean": False,
+            "max_procs": 1,
+            "mode": "local",
+            "db": "postgresql://user:@localhost/table",
+            "debug": True,
+            "server_directory": None,
+            "disable_table_statistics": False,
+            "table_name": None,
+            "offset_x": None,
+            "offset_y": None,
+        }
+        raster.director(args)
+
+
 class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
     """
     Class that handles the conversion between RO-Crate metadata and OMERO objects.
@@ -37,6 +127,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
     Transfer method, which determines how images are sent to OMERO.
     `ln_s` is "in-place" importing, but it requires that this process has acess to both the image and permissions to write to the OMERO server.
     """
+    segmentation_uploader: SegmentationUploader
+    "SegmentationUploader instance to handle segmentation uploads."
 
     @property
     def namespaces(self) -> Namespaces:
@@ -103,20 +195,29 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """)
         return result['dataset_id']
 
-    def find_images(self) -> Iterable[tuple[Identifier, Path]]:
+    def find_images(self) -> Iterable[tuple[Identifier, Path, Union[Path, None]]]:
         """
-        Finds images that should be uploaded to OMERO.
-        Can be overridden to customize the image selection, although this typically isn't needed.
+        Finds images that should be uploaded to OMERO and returns their associated segmentation
+        file.
+        Can be overridden to customize the query.
+
+        Returns:
+        Yields tuples of (image URI, image path, segmentation path).
         """
         for result in self.select_many("""
-            SELECT ?file_path
+            SELECT ?file_path ?segmentation_file
             WHERE {
                 ?file_path a schema:MediaObject ;
-                    omerocrate:upload true ;
+                    omerocrate:upload true .
+                OPTIONAL {
+                    ?file_path omerocrate:segmentationFor ?segmentation_file .
+                }
             }
         """):
             file_path = result['file_path']
-            yield file_path, Path(urlparse(file_path).path)
+            segmentation_file = result['segmentation_file']
+            segmentation_path = Path(urlparse(segmentation_file).path) if segmentation_file else None
+            yield file_path, Path(urlparse(file_path).path), segmentation_path
 
     def make_dataset(self, group: gateway.ExperimenterGroupWrapper) -> gateway.DatasetWrapper:
         """
@@ -246,25 +347,36 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             return self.conn.getObject("ExperimenterGroup", group_id)
             
         return group
-        
+
     async def execute(self) -> gateway.DatasetWrapper:
         """
         Runs the entire processing workflow.
         Typically you don't need to override this method.
         """
         self.connect()
-        img_uris: list[URIRef]
-        img_paths: list[Path]
-        group = await self.make_group()
-        # It seems like the best way to ensure all objects are created in the correct group
+        img_uris: list[uriref]
+        img_paths: list[path]
+        seg_paths: list[path]
+
+        # group = await self.make_group()
+        # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
-        self.conn.setGroupForSession(group.getId())
+        # self.conn.SetGroupForSession(group.getId())
+
+        # --------------- TEMPORARY ---------------
+        group = self.conn.getGroupFromContext()
         dataset = self.make_dataset(group)
-        img_uris, img_paths = list(zip(*self.find_images()))
+        # -----------------------------------------
+
+        dataset = self.make_dataset(group)
+        img_uris, img_paths, seg_paths = list(zip(*self.find_images()))
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri in zip(img_wrappers, img_uris):
+        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
             self.process_image(uri, wrapper)
+            if seg:
+                self.segmentation_uploader.process_segmentation(seg, wrapper)
         return dataset
+
 
 class ApiUploader(OmeroUploader):
     """
@@ -315,108 +427,3 @@ class ApiUploader(OmeroUploader):
                         # Add the image to the dataset
                         dataset._linkObject(wrapper, "DatasetImageLinkI")
                         yield wrapper
-
-
-class SegmentationUploader(ApiUploader):
-    """
-    Subclass of OmeroUploader that also uploads segmentation masks.
-    This class is just a temporary prototype to get this feature working.
-    """
-
-    def find_images_with_segmentation(self) -> Iterable[tuple[Identifier, Path, Path]]:
-        """
-        Finds images containing segmentation masks that should be uploaded to OMERO.
-        Can be overridden to customize the query.
-        """
-        for result in self.select_many("""
-            SELECT ?file_path ?segmentation_file
-            WHERE {
-                ?file_path a schema:MediaObject ;
-                    omerocrate:upload true ;
-                    omerocrate:segmentationFor ?segmentation_file .
-            }
-        """):
-            file_path = result['file_path']
-            segmentation_file = result['segmentation_file']
-            yield file_path, Path(urlparse(file_path).path), Path(urlparse(segmentation_file).path)
-
-    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
-        """
-        Load segmentation mask and upload to OMERO for the given image URI.
-        By default, uses Glencoe's ROI_Converter_NGFF to parse file, rasterise shapes
-        into a zarr file, and register the mask with OMERO.
-        Can be overridden to utilise an alternative segmentation upload method.
-        """
-        header: list[str] = []
-        with open(segmentation_path, 'r') as f:
-            header = f.readline().strip().split(',')
-
-        # Check geometry column name
-        geometry_column = None
-        if "polygon" in header:
-            geometry_column = "polygon"
-        elif "geometry" in header:
-            geometry_column = "geometry"
-        if not geometry_column:
-            raise ValueError(
-                f"Segmentation file {segmentation_path} does not contain a "
-                f"'{geometry_column}' or 'polygon' column"
-            )
-
-        from ROI_Converter_NGFF import raster
-        args = {
-            "input_file": str(segmentation_path),
-            "register_to": image.getId(),
-            "name": segmentation_path.stem,
-            "directory": os.getenv("UPLOAD_DIRECTORY", None),
-            "output_filename": None,
-            "width": None,
-            "height": None,
-            "tile_size": 2048,
-            "no_fill": False,
-            "server": os.getenv("OMERO_HOST", "localhost"),
-            "port": os.getenv("OMERO_PORT", "4064"),
-            "user": self.conn.getUser().getName(),
-            "password": os.getenv("OMERO_PASSWORD", ""),
-            "key": None,
-            "series": "0",
-            "label": None,
-            "overwrite": False,
-            "table": False,
-            "column_name": geometry_column,
-            "downsample_type": "vector",
-            "num_objects": None,
-            "no_clean": False,
-            "max_procs": 1,
-            "mode": "local",
-            "db": "postgresql://user:@localhost/table",
-            "debug": True,
-            "server_directory": None,
-            "disable_table_statistics": False,
-            "table_name": None,
-            "offset_x": None,
-            "offset_y": None,
-        }
-        raster.director(args)
-
-    async def execute(self) -> gateway.DatasetWrapper:
-        """
-        Runs the entire processing workflow.
-        We're overwriting this method to skip group creation for now.
-        """
-        self.connect()
-        img_uris: list[URIRef]
-        img_paths: list[Path]
-        seg_paths: list[Path]
-
-        # Skip any group creation for now as test user needs the correct permissions
-        group = self.conn.getGroupFromContext()
-        dataset = self.make_dataset(group)
-
-        img_uris, img_paths, seg_paths = list(zip(*self.find_images_with_segmentation()))
-        img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
-            self.process_image(uri, wrapper)
-            self.process_segmentation(seg, wrapper)
-
-        return dataset
