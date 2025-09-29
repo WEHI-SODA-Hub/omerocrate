@@ -3,6 +3,7 @@
         "https://w3id.org/ro/crate/1.2-DRAFT/context",
         {
             "upload": "https://w3id.org/WEHI-SODA-Hub/omerocrate/upload",
+            "omerocrate": "https://w3id.org/WEHI-SODA-Hub/omerocrate",
             "segmentationFor": "https://w3id.org/WEHI-SODA-Hub/omerocrate/segmentationFor",
             "experimenterGroup": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ExperimenterGroupRef"
         }
