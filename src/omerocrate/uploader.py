@@ -59,6 +59,8 @@ class OmeNgffUploader(SegmentationUploader):
         By default, uses Glencoe's ROI_Converter_NGFF to parse file, rasterise shapes
         into a zarr file, and register the mask with OMERO.
         """
+        from ROI_Converter_NGFF import raster
+
         header: list[str] = []
         with open(segmentation_path, 'r') as f:
             header = f.readline().strip().split(',')
@@ -75,7 +77,6 @@ class OmeNgffUploader(SegmentationUploader):
                 f"'{geometry_column}' or 'polygon' column"
             )
 
-        from ROI_Converter_NGFF import raster
         args = {
             "input_file": str(segmentation_path),
             "register_to": image.getId(),
