@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from omerocrate.uploader import ApiUploader, OmeroUploader
+from omerocrate.uploader import ApiUploader, OmeroUploader, SegmentationUploader, OmeNgffUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
 from util import check_art_dataset, requires_flower
@@ -10,11 +10,17 @@ from util import check_art_dataset, requires_flower
     ApiUploader,
     pytest.param(TaskqueueUploader, marks=requires_flower)
 ])
+@pytest.mark.parametrize("SegUploader", [
+    OmeNgffUploader
+])
 @pytest.mark.asyncio
-async def test_upload_api(abstract_crate: Path, connection: BlitzGateway, Uploader: type[OmeroUploader]):
+async def test_upload_api(abstract_crate: Path, connection: BlitzGateway,
+                          Uploader: type[OmeroUploader],
+                          SegUploader: type[SegmentationUploader]):
     uploader = Uploader(
         conn=connection,
-        crate=abstract_crate
+        crate=abstract_crate,
+        segmentation_uploader=SegUploader(conn=connection)
     )
     dataset = await uploader.execute()
     check_art_dataset(dataset)

@@ -359,6 +359,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         seg_paths: list[path]
 
         group = await self.make_group()
+        # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
         self.conn.setGroupForSession(group.getId())
