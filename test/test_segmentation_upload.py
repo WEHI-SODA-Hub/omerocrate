@@ -28,4 +28,4 @@ async def test_segmentation_upload(nuclear_image: Path, connection: BlitzGateway
         segmentation_uploader=SegUploader(conn=connection),
     )
     dataset = await uploader.execute()
-    check_seg_dataset(dataset)
+    check_seg_dataset(dataset, connection)

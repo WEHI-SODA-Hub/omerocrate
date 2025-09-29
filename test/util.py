@@ -3,6 +3,7 @@ from pathlib import Path
 from omero.gateway import DatasetWrapper
 import pytest
 from omerocrate.utils import delete_dataset
+from omero.gateway import BlitzGateway
 from dotenv import get_key
 
 def check_art_dataset(dataset: DatasetWrapper):
@@ -17,15 +18,18 @@ def check_art_dataset(dataset: DatasetWrapper):
     delete_dataset(dataset)
 
 
-def check_seg_dataset(dataset: DatasetWrapper):
+def check_seg_dataset(dataset: DatasetWrapper, conn: BlitzGateway):
     """
     Check if the test segmentation dataset has been uploaded correctly
     """
     assert dataset.name == "Nuclear image"
     assert dataset.countChildren() == 1
+    roi_service = conn.getRoiService()
     for image in dataset.listChildren():
         assert "Nuclear image" in image.name
-        # TODO: check segmentation here; using image.sizeOfRois() does not work
+        result = roi_service.findByImage(image.getId(), None)
+        assert len(result.rois) > 0, "No ROIs found for image"
+    roi_service.close()
     delete_dataset(dataset)
 
 root = Path(__file__).parent.parent
