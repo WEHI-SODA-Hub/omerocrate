@@ -358,15 +358,10 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         img_paths: list[path]
         seg_paths: list[path]
 
-        # group = await self.make_group()
+        group = await self.make_group()
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
-        # self.conn.SetGroupForSession(group.getId())
-
-        # --------------- TEMPORARY ---------------
-        group = self.conn.getGroupFromContext()
-        dataset = self.make_dataset(group)
-        # -----------------------------------------
+        self.conn.SetGroupForSession(group.getId())
 
         dataset = self.make_dataset(group)
         img_uris, img_paths, seg_paths = list(zip(*self.find_images()))
