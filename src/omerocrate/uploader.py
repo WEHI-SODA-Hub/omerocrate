@@ -207,29 +207,45 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """)
         return result['dataset_id']
 
-    def find_images(self) -> Iterable[tuple[Identifier, Path, Union[Path, None]]]:
+    def find_images(self) -> Iterable[tuple[Identifier, Path]]:
         """
-        Finds images that should be uploaded to OMERO and returns their associated segmentation
-        file.
-        Can be overridden to customize the query.
+        Finds images that should be uploaded to OMERO.
+        Can be overridden to customize the image selection, although this typically isn't needed.
 
         Returns:
-        Yields tuples of (image URI, image path, segmentation path).
+            Yields tuples of (image URI, image path).
         """
         for result in self.select_many("""
-            SELECT ?file_path ?segmentation_file
+            SELECT ?file_path
             WHERE {
                 ?file_path a schema:MediaObject ;
-                    omerocrate:upload true .
-                OPTIONAL {
-                    ?file_path omerocrate:segmentationFor ?segmentation_file .
-                }
+                    omerocrate:upload true ;
             }
         """):
             file_path = result['file_path']
-            segmentation_file = result['segmentation_file']
-            segmentation_path = Path(urlparse(segmentation_file).path) if segmentation_file else None
-            yield file_path, Path(urlparse(file_path).path), segmentation_path
+            yield file_path, Path(urlparse(file_path).path)
+
+    def find_segmentation_for_image(self, image_uri: Identifier) -> Union[Path, None]:
+        """
+        Finds the segmentation file associated with a given image URI.
+        Can be overridden to customize the query.
+
+        Params:
+            image_uri: The URI of the image for which to find the segmentation file.
+
+        Returns:
+            Path to the segmentation file, or None if no segmentation file is found.
+        """
+        try:
+            result = self.select_one("""
+                SELECT ?segmentation_file
+                WHERE {
+                    ?file_path omerocrate:segmentationFor ?segmentation_file .
+                }
+            """, variables={"file_path": image_uri})
+            return Path(urlparse(result['segmentation_file']).path)
+        except ValueError:
+            return None
 
     def make_dataset(self, group: gateway.ExperimenterGroupWrapper) -> gateway.DatasetWrapper:
         """
@@ -368,7 +384,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[uriref]
         img_paths: list[path]
-        seg_paths: list[path]
 
         group = await self.make_group()
         # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
@@ -377,10 +392,11 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.conn.setGroupForSession(group.getId())
 
         dataset = self.make_dataset(group)
-        img_uris, img_paths, seg_paths = list(zip(*self.find_images()))
+        img_uris, img_paths = list(zip(*self.find_images()))
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri, seg in zip(img_wrappers, img_uris, seg_paths):
+        for wrapper, uri in zip(img_wrappers, img_uris):
             self.process_image(uri, wrapper)
+            seg = self.find_segmentation_for_image(uri)
             if seg:
                 self.segmentation_uploader.process_segmentation(seg, wrapper)
         return dataset
