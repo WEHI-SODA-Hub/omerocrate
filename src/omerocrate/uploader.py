@@ -139,7 +139,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
     Transfer method, which determines how images are sent to OMERO.
     `ln_s` is "in-place" importing, but it requires that this process has acess to both the image and permissions to write to the OMERO server.
     """
-    segmentation_uploader: SegmentationUploader
+    segmentation_uploader: SegmentationUploader | None = None
     "SegmentationUploader instance to handle segmentation uploads."
 
     @property
@@ -396,6 +396,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
         for wrapper, uri in zip(img_wrappers, img_uris):
             self.process_image(uri, wrapper)
+            if self.segmentation_uploader is None:
+                continue
             seg = self.find_segmentation_for_image(uri)
             if seg:
                 self.segmentation_uploader.process_segmentation(seg, wrapper)

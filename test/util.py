@@ -18,7 +18,7 @@ def check_art_dataset(dataset: DatasetWrapper):
     delete_dataset(dataset)
 
 
-def check_seg_dataset(dataset: DatasetWrapper, conn: BlitzGateway):
+def check_seg_dataset(dataset: DatasetWrapper, conn: BlitzGateway, check_roi: bool):
     """
     Check if the test segmentation dataset has been uploaded correctly
     """
@@ -27,10 +27,12 @@ def check_seg_dataset(dataset: DatasetWrapper, conn: BlitzGateway):
     roi_service = conn.getRoiService()
     for image in dataset.listChildren():
         assert "Nuclear image" in image.name
-        result = roi_service.findByImage(image.getId(), None)
-        assert len(result.rois) > 0, "No ROIs found for image"
+        if check_roi:
+            result = roi_service.findByImage(image.getId(), None)
+            assert len(result.rois) > 0, "No ROIs found for image"
     roi_service.close()
     delete_dataset(dataset)
 
 root = Path(__file__).parent.parent
 requires_flower= pytest.mark.skipif(not (os.environ.get("FLOWER_HOST") or get_key(root / ".env", "FLOWER_HOST")), reason="OMERO taskqueue not available")
+requires_roi_tool = pytest.mark.skipif(os.getenv("RUNNER_ENVIRONMENT") == "github-hosted", reason="ROI tool not available on GitHub-hosted runners")

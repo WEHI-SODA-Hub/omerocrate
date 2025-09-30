@@ -10,17 +10,13 @@ from util import check_art_dataset, requires_flower
     ApiUploader,
     pytest.param(TaskqueueUploader, marks=requires_flower)
 ])
-@pytest.mark.parametrize("SegUploader", [
-    SegmentationUploader
-])
 @pytest.mark.asyncio
 async def test_upload_api(abstract_crate: Path, connection: BlitzGateway,
-                          Uploader: type[OmeroUploader],
-                          SegUploader: type[SegmentationUploader]):
+                          Uploader: type[OmeroUploader]):
     uploader = Uploader(
         conn=connection,
         crate=abstract_crate,
-        segmentation_uploader=SegUploader(conn=connection, upload_directory=None)
+        segmentation_uploader=None
     )
     dataset = await uploader.execute()
     check_art_dataset(dataset)
