@@ -1,10 +1,10 @@
+from __future__ import annotations
 from dataclasses import dataclass
-import os
 import importlib.util
 import logging
 from pathlib import Path
 from time import sleep
-from typing import Any, Iterable, Union, Literal, cast, AsyncIterable
+from typing import Any, Iterable, Literal, cast, AsyncIterable
 from rdflib import Graph, URIRef
 from rdflib.query import ResultRow
 from rdflib.term import Identifier
@@ -32,7 +32,7 @@ class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
     """
     conn: gateway.BlitzGateway
     "OMERO connection object, typically obtained using [`from_env`][omerocrate.gateway.from_env]"
-    upload_directory: Union[Path, None] = None
+    upload_directory: Path | None = None
     """
     Directory where segmentation files are output after processing. If None, the crate
     directory will be used.
@@ -225,7 +225,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
 
-    def find_segmentation_for_image(self, image_uri: Identifier) -> Union[Path, None]:
+    def find_segmentation_for_image(self, image_uri: Identifier) -> Path | None:
         """
         Finds the segmentation file associated with a given image URI.
         Can be overridden to customize the query.
@@ -382,8 +382,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Typically you don't need to override this method.
         """
         self.connect()
-        img_uris: list[uriref]
-        img_paths: list[path]
+        img_uris: list[URIRef]
+        img_paths: list[Path]
 
         group = await self.make_group()
         # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups

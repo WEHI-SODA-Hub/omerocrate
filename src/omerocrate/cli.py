@@ -1,5 +1,6 @@
+from __future__ import annotations
 from pathlib import Path
-from typing import Annotated, Union
+from typing import Annotated
 import typer
 from importlib import import_module
 from asyncio import run
@@ -13,7 +14,7 @@ def upload(
     crate: Annotated[Path, typer.Argument(help="Path to the directory containing the RO-Crate")],
     uploader_path: Annotated[str, typer.Option("--uploader", "-u", help="Module path to the OmeroUploader class")] = "omerocrate.ApiUploader",
     seg_uploader_path: Annotated[str, typer.Option("--seg-uploader", "-s", help="Module path to the SegmentationUploader class")] = "omerocrate.SegmentationUploader",
-    seg_upload_dir: Annotated[Union[Path, None], typer.Option("--seg-upload-dir", "-d", help="Directory to upload segmentations")] = None
+    seg_upload_dir: Annotated[Path | None, typer.Option("--seg-upload-dir", "-d", help="Directory to upload segmentations")] = None
 ):
     module_path, cls_name = uploader_path.rsplit('.', 1)
     module = import_module(module_path)
