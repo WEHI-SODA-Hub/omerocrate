@@ -14,7 +14,8 @@ from omero.model import enums
 from omero.rtypes import rstring, rbool
 from urllib.parse import urlparse
 import asyncio
-from pydantic import BaseModel
+from typing_extensions import Self
+from pydantic import BaseModel, model_validator
 
 from omerocrate.utils import user_in_group
 
@@ -31,6 +32,11 @@ class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
     """
     conn: gateway.BlitzGateway
     "OMERO connection object, typically obtained using [`from_env`][omerocrate.gateway.from_env]"
+    upload_directory: Union[Path, None] = None
+    """
+    Directory where segmentation files are output after processing. If None, the crate
+    directory will be used.
+    """
 
     def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
         """
@@ -46,12 +52,15 @@ class OmeNgffUploader(SegmentationUploader):
     Assumes that the segmentation file is a CSV with a 'polygon' or 'geometry' column containing WKT
     polygons, and an 'object' or 'id' column for object identifiers.
     Requires ROI_Converter_NGFF to be installed and accessible in the Python environment.
+    Note that the upload_directory must be visible to the OMERO server, and accessible by the
+    omero user.
     """
+    @model_validator(mode="after")
+    def check_dependencies(self) -> Self:
+        if not importlib.util.find_spec("ROI_Converter_NGFF"):
+            raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
+        return self
 
-    def __init__(self, conn: gateway.BlitzGateway):
-        if importlib.util.find_spec("ROI_Converter_NGFF") is None:
-            raise ImportError("ROI_Converter_NGFF is required for OmeNgffUploader.")
-        super().__init__(conn=conn)
 
     def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
         """
@@ -77,11 +86,13 @@ class OmeNgffUploader(SegmentationUploader):
                 f"'{geometry_column}' or 'polygon' column"
             )
 
+        upload_dir = self.upload_directory if \
+            self.upload_directory else str(segmentation_path.parent)
         args = {
             "input_file": str(segmentation_path),
             "register_to": image.getId(),
             "name": segmentation_path.stem,
-            "directory": os.getenv("UPLOAD_DIRECTORY", None),
+            "directory": upload_dir,
             "output_filename": None,
             "width": None,
             "height": None,

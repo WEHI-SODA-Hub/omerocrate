@@ -20,7 +20,7 @@ async def test_upload_api(abstract_crate: Path, connection: BlitzGateway,
     uploader = Uploader(
         conn=connection,
         crate=abstract_crate,
-        segmentation_uploader=SegUploader(conn=connection)
+        segmentation_uploader=SegUploader(conn=connection, upload_directory=None)
     )
     dataset = await uploader.execute()
     check_art_dataset(dataset)

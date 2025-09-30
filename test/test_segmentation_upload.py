@@ -25,7 +25,7 @@ async def test_segmentation_upload(nuclear_image: Path, connection: BlitzGateway
     uploader = Uploader(
         conn=connection,
         crate=nuclear_image,
-        segmentation_uploader=SegUploader(conn=connection),
+        segmentation_uploader=SegUploader(conn=connection, upload_directory=None),
     )
     dataset = await uploader.execute()
     check_seg_dataset(dataset, connection)
