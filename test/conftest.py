@@ -4,6 +4,7 @@ import pytest
 from omerocrate.gateway import from_env
 from omero.gateway import BlitzGateway
 import dotenv
+import urllib.request
 
 @pytest.fixture
 def abstract_crate() -> Path:
@@ -19,6 +20,14 @@ def ca_imaging() -> Path:
 @pytest.fixture
 def ca_imaging_1021(ca_imaging: Path) -> Path:
     return ca_imaging / "ro-crate_1021"
+
+@pytest.fixture
+def nuclear_image() -> Path:
+    out = Path(__file__).parent / "demo_segmentation"
+    if not (out / "nuclear_image.tif").exists():
+        url = "https://github.com/nf-core/test-datasets/raw/refs/heads/modules/data/imaging/segmentation/nuclear_image.tif"
+        urllib.request.urlretrieve(url, out / "nuclear_image.tif")
+    return out
 
 @pytest.fixture
 def connection() -> BlitzGateway:

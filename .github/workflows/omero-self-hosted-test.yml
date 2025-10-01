@@ -1,0 +1,36 @@
+name: Test with self-hosted OMERO
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    env:
+      OMERO_USER: ${{ secrets.OMERO_USER }}
+      OMERO_PASSWORD: ${{ secrets.OMERO_PASSWORD }}
+      OMERO_HOST: localhost
+      OMERO_PORT: 4064
+      OMERO_SECURE: true
+
+    runs-on: [ self-hosted, omero-plus-dev ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python with uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.9"
+
+    - name: Install dependencies
+      run: |
+        uv sync --all-extras
+        uv pip install source /opt/github-runner/ROI_Converter_NGFF-0.7.0-py3-none-any.whl
+
+    - name: Run tests
+      run: uv run pytest
