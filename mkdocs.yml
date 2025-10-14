@@ -11,10 +11,11 @@ plugins:
       handlers:
         python:
           options:
+            heading_level: 3
             show_source: false
             show_root_heading: true
             separate_signature: false
-            show_signature_annotations: false
+            show_signature_annotations: true
             show_signature: true
 
 
