@@ -61,7 +61,6 @@ class OmeNgffUploader(SegmentationUploader):
             raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
         return self
 
-
     def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
@@ -225,9 +224,30 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
 
+    def find_image_ids(self) -> Iterable[tuple[Identifier, int]]:
+        """
+        Finds images with existing OMERO image IDs that should be processed but not uploaded to
+        OMERO (imageID is specified and upload value is false). This is typically used for adding
+        segmentations to existing images.
+        Can be overridden to customize the query.
+
+        Returns:
+            Yields tuples of (image URI, image ID).
+        """
+        for result in self.select_many("""
+            SELECT ?file_path ?image_id
+            WHERE {
+                ?file_path a schema:MediaObject ;
+                    omerocrate:upload false ;
+                    ome:ImageID ?image_id .
+            }
+        """):
+            file_path = result['file_path']
+            yield file_path, int(result['image_id'])
+
     def find_segmentation_for_image(self, image_uri: Identifier) -> Path | None:
         """
-        Finds the segmentation file associated with a given image URI.
+        Finds the segmentation file associated with a given image URI to be uploaded to OMERO.
         Can be overridden to customize the query.
 
         Params:
@@ -373,8 +393,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
                 ldap=False
             )
             return self.conn.getObject("ExperimenterGroup", group_id)
-            
-        return group
 
     async def execute(self) -> gateway.DatasetWrapper:
         """
@@ -384,15 +402,53 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
+        img_uris_with_ids: list[URIRef]
+        img_ids: list[int]
 
-        group = await self.make_group()
-        # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
+        # TODO: to test, we will have to make sure the image upload runs first,
+        # and then we get the resulting image ID, change this (somehow) in the
+        # RO-Crate metadata, and then run the rest
+
+        # TODO: think of a more elegant way to handle this
+        try:
+            img_uris, img_paths = list(zip(*self.find_images()))
+        except ValueError:
+            # No images to upload
+            img_uris, img_paths = [], []
+
+        try:
+            img_uris_with_ids, img_ids = list(zip(*self.find_image_ids()))
+        except ValueError:
+            # No existing images to process
+            img_uris_with_ids, img_ids = [], []
+
+        # Make group and dataset only if we have images to upload
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
-        self.conn.setGroupForSession(group.getId())
+        if len(img_uris) > 0:
+            # group = await self.make_group()
+            group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
+            self.conn.setGroupForSession(group.getId())
+            dataset = self.make_dataset(group)
+        elif len(img_uris_with_ids) > 0:
+            # Get existing images' groups and datasets
+            first_image = self.conn.getObject("Image", img_ids[0])
+            if first_image is None:
+                raise ValueError(f"Image with ID {img_ids[0]} not found")
 
-        dataset = self.make_dataset(group)
-        img_uris, img_paths = list(zip(*self.find_images()))
+            # TODO: check how we get the group for existing images/datasets
+            group = self.conn.getGroupFromContext()
+            self.conn.setGroupForSession(group.getId())
+
+            datasets = first_image.getParent()
+            if len(datasets) == 0:
+                raise ValueError(f"Image with ID {img_ids[0]} is not in a dataset, cannot proceed")
+
+            dataset = datasets[0]
+            logger.warning(f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})")
+        else:
+            raise ValueError("No images to upload or process")
+
         img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
         for wrapper, uri in zip(img_wrappers, img_uris):
             self.process_image(uri, wrapper)
@@ -401,6 +457,12 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             seg = self.find_segmentation_for_image(uri)
             if seg:
                 self.segmentation_uploader.process_segmentation(seg, wrapper)
+
+        # Upload only segmentations for existing images
+        if self.segmentation_uploader is not None and len(img_uris_with_ids) > 0:
+            # TODO: implementation
+            pass
+
         return dataset
 
 
