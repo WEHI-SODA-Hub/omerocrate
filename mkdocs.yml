@@ -16,6 +16,12 @@ plugins:
             separate_signature: false
             show_signature_annotations: false
             show_signature: true
+  - redirects:
+      redirect_maps:
+        # Ensure all IRIs resolve to the IRI documentation page
+        'segmentationFor.md': 'docs/iris.md'
+        'upload.md': 'docs/iris.md'
+        'experimenterGroup.md': 'docs/iris.md'
 
 
 theme:
@@ -36,5 +42,5 @@ nav:
   - Getting Started: README.md
   - docs/api.md
   - docs/cli.md
-  - docs/roadmap.md
+  - docs/iris.md
   - GitHub: 'https://github.com/WEHI-SODA-Hub/OmeroCrate'
