@@ -16,10 +16,13 @@
             "name": "Nuclear image",
             "isBasedOn": "https://github.com/nf-core/test-datasets",
             "upload": false,
-            "imageID": "1262",
+            "imageID": "1262"
+        },
+        {
+            "@id": "whole-cell_image_segmentation.csv",
+            "@type": "File",
             "segmentationFor": {
-                "@id": "whole-cell_image_segmentation.csv",
-                "@type": "File"
+                "@id": "nuclear_image.tif"
             }
         },
         {

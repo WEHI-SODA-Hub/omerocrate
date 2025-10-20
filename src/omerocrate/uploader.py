@@ -260,9 +260,9 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             result = self.select_one("""
                 SELECT ?segmentation_file
                 WHERE {
-                    ?file_path omerocrate:segmentationFor ?segmentation_file .
+                    ?segmentation_file omerocrate:segmentationFor ?image_path .
                 }
-            """, variables={"file_path": image_uri})
+            """, variables={"image_path": image_uri})
             return Path(urlparse(result['segmentation_file']).path)
         except ValueError:
             return None
@@ -440,11 +440,10 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             group = self.conn.getGroupFromContext()
             self.conn.setGroupForSession(group.getId())
 
-            datasets = first_image.getParent()
-            if len(datasets) == 0:
+            dataset = first_image.getParent()
+            if dataset is None:
                 raise ValueError(f"Image with ID {img_ids[0]} is not in a dataset, cannot proceed")
 
-            dataset = datasets[0]
             logger.warning(f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})")
         else:
             raise ValueError("No images to upload or process")
@@ -460,8 +459,11 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
         # Upload only segmentations for existing images
         if self.segmentation_uploader is not None and len(img_uris_with_ids) > 0:
-            # TODO: implementation
-            pass
+            for img_id, uri in zip(img_ids, img_uris_with_ids):
+                seg = self.find_segmentation_for_image(uri)
+                if seg:
+                    wrapper = self.conn.getObject("Image", img_id)
+                    self.segmentation_uploader.process_segmentation(seg, wrapper)
 
         return dataset
 
