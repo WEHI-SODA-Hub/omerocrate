@@ -240,9 +240,9 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             result = self.select_one("""
                 SELECT ?segmentation_file
                 WHERE {
-                    ?file_path omerocrate:segmentationFor ?segmentation_file .
+                    ?segmentation_file omerocrate:segmentationFor ?image_path .
                 }
-            """, variables={"file_path": image_uri})
+            """, variables={"image_path": image_uri})
             return Path(urlparse(result['segmentation_file']).path)
         except ValueError:
             return None
