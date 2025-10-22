@@ -435,7 +435,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             dataset = first_image.getParent()
             if dataset is None:
                 raise ValueError(f"Image with ID {img_ids[0]} is not in a dataset.")
-            logger.warning(f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})")
+            logger.info(f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})")
         else:
             raise ValueError("No images to upload or process")
 
