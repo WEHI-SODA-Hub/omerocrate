@@ -415,8 +415,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
         if len(img_uris) > 0:
-            # group = await self.make_group()
-            group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
+            group = await self.make_group()
+            # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
             self.conn.setGroupForSession(group.getId())
             dataset = self.make_dataset(group)
         elif len(img_uris_with_ids) > 0:

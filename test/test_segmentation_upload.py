@@ -1,5 +1,8 @@
 from pathlib import Path
 import pytest
+import json
+import tempfile
+import shutil
 from omerocrate.uploader import OmeroUploader, ApiUploader, SegmentationUploader, OmeNgffUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
@@ -52,9 +55,35 @@ async def test_segmentation_upload_existing_image(nuclear_image: Path,
     )
     dataset = await uploader.execute()
 
-    # Set the crate to the secong segmentation to upload to existing image
-    uploader.crate = wholecell_segmentation
+    # Get image ID for setting in the RO-Crate
+    image_id = None
+    for image in dataset.listChildren():
+        image_id = image.getId()
 
-    # TODO: here we need to set the image ID in the RO-Crate metadata to point to the existing image
+    # We need to modify the RO-Crate to set the image ID to the existing image
+    # Create a temporary copy of the crate to modify
+    temp_crate_dir = tempfile.mkdtemp()
+    temp_crate_path = Path(temp_crate_dir)
+    shutil.copytree(wholecell_segmentation, temp_crate_path / "crate", dirs_exist_ok=True)
+
+    metadata_path = temp_crate_path / "crate" / "ro-crate-metadata.json"
+    with open(metadata_path, 'r') as f:
+        crate_data = json.load(f)
+
+    for item in crate_data["@graph"]:
+        if item.get("@id") == "nuclear_image.tif":
+            item["imageID"] = str(image_id)
+            break
+
+    with open(metadata_path, 'w') as f:
+        json.dump(crate_data, f, indent=4)
+
+    # Make a new uploader with the temporary crate
+    uploader = Uploader(
+        conn=connection,
+        crate=temp_crate_path / "crate",
+        segmentation_uploader=seg_uploader,
+    )
+    dataset = await uploader.execute()
 
     check_seg_dataset(dataset, connection, True, n_rois_expected=2)
