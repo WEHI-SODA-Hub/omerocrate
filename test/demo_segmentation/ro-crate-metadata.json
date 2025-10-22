@@ -14,10 +14,13 @@
             "@type": "File",
             "name": "Nuclear image",
             "isBasedOn": "https://github.com/nf-core/test-datasets",
-            "upload": true,
+            "upload": true
+        },
+        {
+            "@id": "nuclear_image_segmentation.csv",
+            "@type": "File",
             "segmentationFor": {
-                "@id": "nuclear_image_segmentation.csv",
-                "@type": "File"
+                "@id": "nuclear_image.tif"
             }
         },
         {

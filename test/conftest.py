@@ -30,6 +30,10 @@ def nuclear_image() -> Path:
     return out
 
 @pytest.fixture
+def wholecell_segmentation() -> Path:
+    return Path(__file__).parent / "demo_segmentation_with_imageid"
+
+@pytest.fixture
 def connection() -> BlitzGateway:
     # To run the tests, each user will need to provide credentials for their own OMERO server
     # .env is a convenient way to store these credentials

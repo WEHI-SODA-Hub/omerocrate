@@ -405,10 +405,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         img_uris_with_ids: list[URIRef]
         img_ids: list[int]
 
-        # TODO: to test, we will have to make sure the image upload runs first,
-        # and then we get the resulting image ID, change this (somehow) in the
-        # RO-Crate metadata, and then run the rest
-
         images = list(self.find_images())
         img_uris, img_paths = (list(zip(*images)) if images else ([], []))
 
