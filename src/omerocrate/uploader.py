@@ -247,7 +247,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
     def find_segmentation_for_image(self, image_uri: Identifier) -> Path | None:
         """
-        Finds the segmentation file associated with a given image URI to be uploaded to OMERO.
+        Finds the segmentation file associated with a given image URI.
         Can be overridden to customize the query.
 
         Params:
