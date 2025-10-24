@@ -15,7 +15,7 @@
             "@type": "File",
             "name": "Nuclear image",
             "isBasedOn": "https://github.com/nf-core/test-datasets",
-            "upload": false,
+            "upload": true,
             "imageID": "1262"
         },
         {

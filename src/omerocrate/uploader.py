@@ -224,7 +224,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
 
-    def find_image_ids(self) -> Iterable[tuple[Identifier, int]]:
+    def find_existing_images(self) -> Iterable[tuple[Identifier, int]]:
         """
         Finds images with existing OMERO image IDs that should be processed but not uploaded to
         OMERO (imageID is specified and upload value is false). This is typically used for adding
@@ -238,7 +238,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             SELECT ?file_path ?image_id
             WHERE {
                 ?file_path a schema:MediaObject ;
-                    omerocrate:upload false ;
+                    omerocrate:upload true ;
                     ome:ImageID ?image_id .
             }
         """):
@@ -402,27 +402,31 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-        img_uris_with_ids: list[URIRef]
-        img_ids: list[int]
+        existing_img_uris: list[URIRef]
+        existing_img_ids: list[int]
+
+        existing_images = list(self.find_existing_images())
+        existing_img_uris, existing_img_ids = (
+            list(zip(*existing_images)) if existing_images else ([], [])
+        )
 
         images = list(self.find_images())
+        images = [(uri, path) for uri, path in images if uri not in existing_img_uris]
         img_uris, img_paths = (list(zip(*images)) if images else ([], []))
-
-        images_with_ids = list(self.find_image_ids())
-        img_uris_with_ids, img_ids = (list(zip(*images_with_ids)) if images_with_ids else ([], []))
 
         # Make group and dataset only if we have images to upload
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
+
         if len(img_uris) > 0:
             group = await self.make_group()
             # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
             self.conn.setGroupForSession(group.getId())
             dataset = self.make_dataset(group)
-        elif len(img_uris_with_ids) > 0:
+        elif len(existing_img_ids) > 0:
             # Use first image to get group and dataset
             # TODO: question: do we need to check that all images are in the same group/dataset?
-            first_image = self.conn.getObject("Image", img_ids[0])
+            first_image = self.conn.getObject("Image", existing_img_ids[0])
             if first_image is None:
                 raise ValueError(f"Image with ID {img_ids[0]} not found")
 
@@ -449,8 +453,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
                 self.segmentation_uploader.process_segmentation(seg, wrapper)
 
         # Upload only segmentations for existing images
-        if self.segmentation_uploader is not None and len(img_uris_with_ids) > 0:
-            for img_id, uri in zip(img_ids, img_uris_with_ids):
+        if self.segmentation_uploader is not None and len(existing_img_uris) > 0:
+            for img_id, uri in zip(existing_img_ids, existing_img_uris):
                 seg = self.find_segmentation_for_image(uri)
                 if seg:
                     wrapper = self.conn.getObject("Image", img_id)
