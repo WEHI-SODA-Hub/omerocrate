@@ -417,29 +417,36 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         # Make group and dataset only if we have images to upload
         # it seems like the best way to ensure all objects are created in the correct group
         # is to set the group for the session
-
+        dataset: gateway.DatasetWrapper | None = None
         if len(img_uris) > 0:
             group = await self.make_group()
             # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
             self.conn.setGroupForSession(group.getId())
             dataset = self.make_dataset(group)
         elif len(existing_img_ids) > 0:
-            # Use first image to get group and dataset
-            # TODO: question: do we need to check that all images are in the same group/dataset?
-            first_image = self.conn.getObject("Image", existing_img_ids[0])
-            if first_image is None:
-                raise ValueError(f"Image with ID {img_ids[0]} not found")
+            # Check that images have IDs and are in the same dataset
+            for img_id in existing_img_ids:
+                img = self.conn.getObject("Image", img_id)
+                if img is None:
+                    raise ValueError(f"Image with ID {img_id} not found")
 
-            # Get group associated with the image
-            group = first_image.getDetails().getGroup()
+                img_dataset = img.getParent()
+                if img_dataset is None:
+                    raise ValueError(f"Image with ID {img_id} is not in a dataset")
+
+                if dataset is None:
+                    dataset = img_dataset
+                    logger.info(
+                        f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})"
+                    )
+                if img_dataset is None or img_dataset.getId() != dataset.getId():
+                    raise ValueError("All existing images must be in the same dataset")
+
+            # Get group from dataset
+            group = dataset.getDetails().getGroup()
             self.conn.setGroupForSession(group.getId())
             logger.warning(f"Using existing group {group.getName()} (ID: {group.getId()})")
 
-            # Dataset associated with the image
-            dataset = first_image.getParent()
-            if dataset is None:
-                raise ValueError(f"Image with ID {img_ids[0]} is not in a dataset.")
-            logger.info(f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})")
         else:
             raise ValueError("No images to upload or process")
 
