@@ -38,7 +38,7 @@ class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
     directory will be used.
     """
 
-    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
+    def process_segmentation(self, segmentation_path: Path | None, image: gateway.ImageWrapper) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
         Users should override this method to implement segmentation upload logic.
@@ -61,13 +61,17 @@ class OmeNgffUploader(SegmentationUploader):
             raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
         return self
 
-    def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
+    def process_segmentation(self, segmentation_path: Path | None, image: gateway.ImageWrapper) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
         By default, uses Glencoe's ROI_Converter_NGFF to parse file, rasterise shapes
         into a zarr file, and register the mask with OMERO.
         """
         from ROI_Converter_NGFF import raster
+
+        if segmentation_path is None:
+            logger.info(f"No segmentation file provided for image {image.getId()}, skipping.")
+            return None
 
         header: list[str] = []
         with open(segmentation_path, 'r') as f:
@@ -457,16 +461,14 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             if self.segmentation_uploader is None:
                 continue
             seg = self.find_segmentation_for_image(uri)
-            if seg:
-                self.segmentation_uploader.process_segmentation(seg, wrapper)
+            self.segmentation_uploader.process_segmentation(seg, wrapper)
 
         # Upload only segmentations for existing images
         if self.segmentation_uploader is not None and len(existing_img_uris) > 0:
             for img_id, uri in zip(existing_img_ids, existing_img_uris):
                 seg = self.find_segmentation_for_image(uri)
-                if seg:
-                    wrapper = self.conn.getObject("Image", img_id)
-                    self.segmentation_uploader.process_segmentation(seg, wrapper)
+                wrapper = self.conn.getObject("Image", img_id)
+                self.segmentation_uploader.process_segmentation(seg, wrapper)
 
         return dataset
 
