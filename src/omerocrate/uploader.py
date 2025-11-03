@@ -415,12 +415,12 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         img_uris, img_paths = (list(zip(*images)) if images else ([], []))
 
         # Make group and dataset only if we have images to upload
-        # it seems like the best way to ensure all objects are created in the correct group
-        # is to set the group for the session
         dataset: gateway.DatasetWrapper | None = None
         if len(img_uris) > 0:
             group = await self.make_group()
             # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
+
+            # Set group for session to ensure all objects are created in the correct group
             self.conn.setGroupForSession(group.getId())
             dataset = self.make_dataset(group)
         elif len(existing_img_ids) > 0:
@@ -444,9 +444,10 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
             # Get group from dataset
             group = dataset.getDetails().getGroup()
+
+            # Set group for session to ensure all objects are created in the correct group
             self.conn.setGroupForSession(group.getId())
             logger.warning(f"Using existing group {group.getName()} (ID: {group.getId()})")
-
         else:
             raise ValueError("No images to upload or process")
 
