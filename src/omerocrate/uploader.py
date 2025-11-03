@@ -43,6 +43,10 @@ class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
         Load segmentation mask and upload to OMERO for the given image URI.
         Users should override this method to implement segmentation upload logic.
         """
+        if segmentation_path is None:
+            logger.info(f"No segmentation file provided for image {image.getId()}, skipping.")
+            return None
+
         raise NotImplementedError("process_segmentation() must be implemented in a subclass")
 
 
