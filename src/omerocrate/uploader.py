@@ -232,23 +232,29 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
 
-    def find_existing_images(self) -> Iterable[tuple[Identifier, int]]:
+    def find_existing_images(self, image_list: list[Identifier]) -> Iterable[tuple[Identifier, int]]:
         """
-        Finds images with existing OMERO image IDs that should be processed but not uploaded to
-        OMERO (imageID is specified and upload value is false). This is typically used for adding
-        segmentations to existing images.
+        Takes a list of images and returns those that have existing OMERO image IDs.
+        This is typically used for adding segmentations to existing images.
         Can be overridden to customize the query.
+
+        Params:
+            image_list: List of image URIs to check for existing OMERO IDs.
 
         Returns:
             Yields tuples of (image URI, image ID).
         """
-        for result in self.select_many("""
+        if not image_list:
+            return
+
+        uri_values = " ".join(f"<{str(uri)}>" for uri in image_list)
+
+        for result in self.select_many(f"""
             SELECT ?file_path ?image_id
-            WHERE {
-                ?file_path a schema:MediaObject ;
-                    omerocrate:upload true ;
-                    ome:ImageID ?image_id .
-            }
+            WHERE {{
+                ?file_path ome:ImageID ?image_id .
+                FILTER ( ?file_path IN ( {uri_values} ) )
+            }}
         """):
             file_path = result['file_path']
             yield file_path, int(result['image_id'])
@@ -413,14 +419,16 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         existing_img_uris: list[URIRef]
         existing_img_ids: list[int]
 
-        existing_images = list(self.find_existing_images())
+        img_uris, img_paths = list(zip(*self.find_images()))
+
+        existing_images = list(self.find_existing_images(img_uris))
         existing_img_uris, existing_img_ids = (
             list(zip(*existing_images)) if existing_images else ([], [])
         )
 
-        images = list(self.find_images())
-        images = [(uri, path) for uri, path in images if uri not in existing_img_uris]
-        img_uris, img_paths = (list(zip(*images)) if images else ([], []))
+        # Filter out images that already exist
+        img_uris = [uri for uri in img_uris if uri not in existing_img_uris]
+        img_paths = [path for uri, path in zip(img_uris, img_paths) if uri not in existing_img_uris]
 
         # Make group and dataset only if we have images to upload
         dataset: gateway.DatasetWrapper | None = None
