@@ -244,9 +244,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Returns:
             Yields tuples of (image URI, image ID).
         """
-        if not image_list:
-            return
-
         uri_values = " ".join(f"<{str(uri)}>" for uri in image_list)
 
         for result in self.select_many(f"""
