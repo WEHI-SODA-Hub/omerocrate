@@ -413,23 +413,24 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-        existing_img_uris: list[URIRef]
-        existing_img_ids: list[int]
-
         img_uris, img_paths = list(zip(*self.find_images()))
 
         existing_images = list(self.find_existing_images(img_uris))
+        existing_img_uris: list[URIRef]
+        existing_img_ids: list[int]
         existing_img_uris, existing_img_ids = (
             list(zip(*existing_images)) if existing_images else ([], [])
         )
 
         # Filter out images that already exist
-        img_uris = [uri for uri in img_uris if uri not in existing_img_uris]
-        img_paths = [path for uri, path in zip(img_uris, img_paths) if uri not in existing_img_uris]
+        new_img_uris: list[URIRef] = [uri for uri in img_uris if uri not in existing_img_uris]
+        new_img_paths: list[Path] = [
+            path for uri, path in zip(img_uris, img_paths) if uri not in existing_img_uris
+        ]
 
         # Make group and dataset only if we have images to upload
         dataset: gateway.DatasetWrapper | None = None
-        if len(img_uris) > 0:
+        if len(new_img_uris) > 0:
             group = await self.make_group()
             # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
 
@@ -464,8 +465,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         else:
             raise ValueError("No images to upload or process")
 
-        img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri in zip(img_wrappers, img_uris):
+        new_img_wrappers = [img async for img in self.upload_images(new_img_paths, dataset)]
+        for wrapper, uri in zip(new_img_wrappers, new_img_uris):
             self.process_image(uri, wrapper)
             if self.segmentation_uploader is None:
                 continue
