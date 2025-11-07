@@ -5,7 +5,8 @@
             "upload": "https://w3id.org/WEHI-SODA-Hub/omerocrate/upload",
             "omerocrate": "https://w3id.org/WEHI-SODA-Hub/omerocrate",
             "segmentationFor": "https://w3id.org/WEHI-SODA-Hub/omerocrate/segmentationFor",
-            "experimenterGroup": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ExperimenterGroupRef"
+            "experimenterGroup": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ExperimenterGroupRef",
+            "imageID": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ImageID"
         }
     ],
     "@graph": [
@@ -14,10 +15,11 @@
             "@type": "File",
             "name": "Nuclear image",
             "isBasedOn": "https://github.com/nf-core/test-datasets",
-            "upload": true
+            "upload": true,
+            "imageID": "1262"
         },
         {
-            "@id": "nuclear_image_segmentation.csv",
+            "@id": "whole-cell_image_segmentation.csv",
             "@type": "File",
             "segmentationFor": {
                 "@id": "nuclear_image.tif"

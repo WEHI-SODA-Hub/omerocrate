@@ -61,7 +61,6 @@ class OmeNgffUploader(SegmentationUploader):
             raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
         return self
 
-
     def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
         """
         Load segmentation mask and upload to OMERO for the given image URI.
@@ -225,6 +224,30 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             file_path = result['file_path']
             yield file_path, Path(urlparse(file_path).path)
 
+    def find_existing_images(self, image_list: list[Identifier]) -> Iterable[tuple[Identifier, int]]:
+        """
+        Takes a list of images and returns those that have existing OMERO image IDs.
+        This is typically used for adding segmentations to existing images.
+        Can be overridden to customize the query.
+
+        Params:
+            image_list: List of image URIs to check for existing OMERO IDs.
+
+        Returns:
+            Yields tuples of (image URI, image ID).
+        """
+        uri_values = " ".join(f"<{str(uri)}>" for uri in image_list)
+
+        for result in self.select_many(f"""
+            SELECT ?file_path ?image_id
+            WHERE {{
+                ?file_path ome:ImageID ?image_id .
+                FILTER ( ?file_path IN ( {uri_values} ) )
+            }}
+        """):
+            file_path = result['file_path']
+            yield file_path, int(result['image_id'])
+
     def find_segmentation_for_image(self, image_uri: Identifier) -> Path | None:
         """
         Finds the segmentation file associated with a given image URI.
@@ -240,9 +263,9 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             result = self.select_one("""
                 SELECT ?segmentation_file
                 WHERE {
-                    ?file_path omerocrate:segmentationFor ?segmentation_file .
+                    ?segmentation_file omerocrate:segmentationFor ?image_path .
                 }
-            """, variables={"file_path": image_uri})
+            """, variables={"image_path": image_uri})
             return Path(urlparse(result['segmentation_file']).path)
         except ValueError:
             return None
@@ -373,8 +396,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
                 ldap=False
             )
             return self.conn.getObject("ExperimenterGroup", group_id)
-            
-        return group
 
     async def execute(self) -> gateway.DatasetWrapper:
         """
@@ -384,23 +405,75 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-
-        group = await self.make_group()
-        # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
-        # it seems like the best way to ensure all objects are created in the correct group
-        # is to set the group for the session
-        self.conn.setGroupForSession(group.getId())
-
-        dataset = self.make_dataset(group)
         img_uris, img_paths = list(zip(*self.find_images()))
-        img_wrappers = [img async for img in self.upload_images(img_paths, dataset)]
-        for wrapper, uri in zip(img_wrappers, img_uris):
+
+        existing_images = list(self.find_existing_images(img_uris))
+        existing_img_uris: list[URIRef]
+        existing_img_ids: list[int]
+        existing_img_uris, existing_img_ids = (
+            list(zip(*existing_images)) if existing_images else ([], [])
+        )
+
+        # Filter out images that already exist
+        new_img_uris: list[URIRef] = [uri for uri in img_uris if uri not in existing_img_uris]
+        new_img_paths: list[Path] = [
+            path for uri, path in zip(img_uris, img_paths) if uri not in existing_img_uris
+        ]
+
+        # Make group and dataset only if we have images to upload
+        dataset: gateway.DatasetWrapper | None = None
+        if len(new_img_uris) > 0:
+            group = await self.make_group()
+            # group = self.conn.getGroupFromContext()  # if we don't have permissions to create groups
+
+            # Set group for session to ensure all objects are created in the correct group
+            self.conn.setGroupForSession(group.getId())
+            dataset = self.make_dataset(group)
+        elif len(existing_img_ids) > 0:
+            # Check that images have IDs and are in the same dataset
+            for img_id in existing_img_ids:
+                img = self.conn.getObject("Image", img_id)
+                if img is None:
+                    raise ValueError(f"Image with ID {img_id} not found")
+
+                img_dataset = img.getParent()
+                if img_dataset is None:
+                    raise ValueError(f"Image with ID {img_id} is not in a dataset")
+
+                if dataset is None:
+                    dataset = img_dataset
+                    logger.info(
+                        f"Using existing dataset {dataset.getName()} (ID: {dataset.getId()})"
+                    )
+                if img_dataset is None or img_dataset.getId() != dataset.getId():
+                    raise ValueError("All existing images must be in the same dataset")
+
+            # Get group from dataset
+            group = dataset.getDetails().getGroup()
+
+            # Set group for session to ensure all objects are created in the correct group
+            self.conn.setGroupForSession(group.getId())
+            logger.warning(f"Using existing group {group.getName()} (ID: {group.getId()})")
+        else:
+            raise ValueError("No images to upload or process")
+
+        new_img_wrappers = [img async for img in self.upload_images(new_img_paths, dataset)]
+        for wrapper, uri in zip(new_img_wrappers, new_img_uris):
             self.process_image(uri, wrapper)
             if self.segmentation_uploader is None:
                 continue
             seg = self.find_segmentation_for_image(uri)
             if seg:
                 self.segmentation_uploader.process_segmentation(seg, wrapper)
+
+        # Upload only segmentations for existing images
+        if self.segmentation_uploader is not None and len(existing_img_uris) > 0:
+            for img_id, uri in zip(existing_img_ids, existing_img_uris):
+                seg = self.find_segmentation_for_image(uri)
+                if seg:
+                    wrapper = self.conn.getObject("Image", img_id)
+                    self.segmentation_uploader.process_segmentation(seg, wrapper)
+
         return dataset
 
 

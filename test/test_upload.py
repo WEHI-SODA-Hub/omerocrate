@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from omerocrate.uploader import ApiUploader, OmeroUploader, SegmentationUploader
+from omerocrate.uploader import ApiUploader, OmeroUploader
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
 from util import check_art_dataset, requires_flower
