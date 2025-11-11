@@ -82,7 +82,7 @@ If not, the metadata can always become an annotation.
 
 In this case, `dateModified` could be interpreted as the acquisition date of the image.
 If this is true, we could subclass `OmeroUploader` to handle this properly.
-For an example of this, refer to: <https://github.com/WEHI-SODA-Hub/OmeroCrate/blob/no-xml/test/calcium_uploader.py>
+[You can find an example of this subclassing here](https://github.com/WEHI-SODA-Hub/OmeroCrate/blob/main/test/calcium_uploader.py).
 
 Currently if you subclass `OmeroUploader`, you will have to perform the upload in Python:
 
