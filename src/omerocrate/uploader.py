@@ -405,7 +405,13 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-        img_uris, img_paths = list(zip(*self.find_images()))
+
+        img_results = list(self.find_images())
+        if len(img_results) == 0:
+            logger.warning("No files marked for upload in crate")
+            img_uris, img_paths = [], []
+        else:
+            img_uris, img_paths = tuple(zip(*img_results)) # pyright: ignore[reportAssignmentType]
 
         existing_images = list(self.find_existing_images(img_uris))
         existing_img_uris: list[URIRef]
