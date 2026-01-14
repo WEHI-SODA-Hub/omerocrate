@@ -1,11 +1,13 @@
 import asyncio
 from pathlib import Path
+import ssl
 from typing import AsyncIterable, Any, Iterable
 from omero import gateway, model
 import httpx
 import os
 
 from pydantic import Field, computed_field, ValidationError
+import truststore
 
 from omerocrate.taskqueue import models as upload_models
 from omerocrate.uploader import OmeroUploader
@@ -36,18 +38,21 @@ class TaskqueueUploader(OmeroUploader):
     """
     Subclass of OmeroUploader that uses `gs-taskqueue` to upload images to OMERO.
     """
-    client: httpx.AsyncClient = Field(default_factory=httpx.AsyncClient, description="HTTP client for making requests to the Flower API server")
     host: str = Field(default_factory=lambda: os.environ["FLOWER_HOST"], description="Host of the Flower API server")
     username: str = Field(default_factory=lambda: os.environ["FLOWER_USER"], description="Username for the Flower API server")
     password: str = Field(default_factory=lambda: os.environ["FLOWER_PASSWORD"], description="Password for the Flower API server")
 
     @computed_field
     @property
-    def http_auth(self) -> tuple[str, str]:
+    def client(self) -> httpx.AsyncClient:
         """
         Returns the HTTP authentication credentials for the Flower API server.
         """
-        return (self.username, self.password)
+        return httpx.AsyncClient(
+            auth=(self.username, self.password),
+            # Support local certificate stores
+            verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        )
 
     async def upload_images(self, image_paths: list[Path], dataset: gateway.DatasetWrapper, **kwargs: Any) -> AsyncIterable[gateway.ImageWrapper]:
         # We create a dummy project, because `gs-taskqueue` requires one. 
@@ -123,7 +128,6 @@ class TaskqueueUploader(OmeroUploader):
         """
         response = await self.client.post(
             f"{self.host}/flower/api/task/send-task/gs_import_run_omero_import" ,
-            auth=self.http_auth,
             json={"args": [upload.model_dump(exclude_none=True)]},
         )
         log_response(response, request=True)
@@ -139,7 +143,6 @@ class TaskqueueUploader(OmeroUploader):
         # Check the task status
         response = await self.client.get(
             URL_CHECK_INFO,
-            auth=self.http_auth
         )
         log_response(response, request=True)
         response.raise_for_status()
@@ -151,7 +154,6 @@ class TaskqueueUploader(OmeroUploader):
         """
         response = await self.client.get(
             f"{self.host}/flower/api/task/result/{task_id}",
-            auth=self.http_auth
         )
         log_response(response, request=True)
         response.raise_for_status()
