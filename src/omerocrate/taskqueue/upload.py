@@ -46,7 +46,7 @@ class TaskqueueUploader(OmeroUploader):
     @property
     def client(self) -> httpx.AsyncClient:
         """
-        Returns the HTTP authentication credentials for the Flower API server.
+        Returns an authenticated HTTP client for the Flower API server.
         """
         return httpx.AsyncClient(
             auth=(self.username, self.password),
