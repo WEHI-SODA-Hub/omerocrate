@@ -1,9 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
 import importlib.util
 import logging
 from pathlib import Path
-from time import sleep
 from typing import Any, Iterable, Literal, cast, AsyncIterable
 from rdflib import Graph, URIRef
 from rdflib.query import ResultRow
@@ -12,17 +10,17 @@ from functools import cached_property
 from omero import model, gateway, grid, cmd
 from omero.model import enums
 from omero.rtypes import rstring, rbool
-from urllib.parse import urlparse
 import asyncio
 from typing_extensions import Self
 from pydantic import BaseModel, model_validator
 
-from omerocrate.utils import user_in_group
+from omerocrate.utils import uri_to_path, user_in_group
 
 logger = logging.getLogger(__name__)
 
 Namespaces = dict[str, URIRef]
 Variables = dict[str, Identifier]
+
 
 
 class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
@@ -222,7 +220,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             }
         """):
             file_path = result['file_path']
-            yield file_path, Path(urlparse(file_path).path)
+            yield file_path, uri_to_path(file_path)
 
     def find_existing_images(self, image_list: list[Identifier]) -> Iterable[tuple[Identifier, int]]:
         """
@@ -266,7 +264,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
                     ?segmentation_file omerocrate:segmentationFor ?image_path .
                 }
             """, variables={"image_path": image_uri})
-            return Path(urlparse(result['segmentation_file']).path)
+            return uri_to_path(result['segmentation_file'])
         except ValueError:
             return None
 
@@ -319,12 +317,6 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
     def add_image_to_dataset(self, dataset: gateway.DatasetWrapper, image: gateway.ImageWrapper) -> None:
         dataset._linkObject(image, "DatasetImageLinkI")
-
-    def path_from_image_result(self, result: ResultRow) -> Path:
-        """
-        Converts a SPARQL result row to a Path object.
-        """
-        return Path(urlparse(result['file_path']).path)
 
     def process_image(self, uri: URIRef, image: gateway.ImageWrapper) -> None:
         """
