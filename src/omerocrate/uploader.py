@@ -13,6 +13,7 @@ from omero.rtypes import rstring, rbool
 import asyncio
 from typing_extensions import Self
 from pydantic import BaseModel, model_validator
+from enum import Enum
 
 from omerocrate.utils import uri_to_path, user_in_group
 
@@ -21,6 +22,17 @@ logger = logging.getLogger(__name__)
 Namespaces = dict[str, URIRef]
 Variables = dict[str, Identifier]
 
+class OmeroPermissions(str, Enum):
+    """
+    Built-in OMERO permissions categories
+    """
+    # Derive from the OMERO GUI
+    # Seems to a compose of Owner + Group + Other
+    # Each section is `r-` for read only, `rw` for read and write, or `ra` for read and annotate
+    Private = "rw----"
+    ReadOnly = "rwr---"
+    ReadAnnotate = "rwra--"
+    ReadWrite = "rwrw--"
 
 
 class SegmentationUploader(BaseModel, arbitrary_types_allowed=True):
@@ -366,6 +378,17 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             """, variables={"root": self.root_dataset_id})
             return str(result['name'])
 
+    def get_group_perms(self) -> OmeroPermissions:
+        """
+        Specifies the permissions to set for the experimenter group.
+        This will control who can use the uploaded data.
+        It likely does not make sense to set to Private, since this would mean that only the uploader can access the data.
+        Hence, the default is ReadOnly, which allows users in the same group to view the data, but not edit it.
+        This may be overridden by child classes
+        """
+        # TODO: allow configuration via the metadata
+        return OmeroPermissions.ReadOnly
+
     async def make_group(self) -> gateway.ExperimenterGroupWrapper:
         """
         Creates the OMERO experimenter group that corresponds to this crate.
@@ -385,7 +408,8 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             group_id = self.conn.createGroup(
                 name=group_name,
                 member_Ids=[self.conn.getUser().getId()],
-                ldap=False
+                ldap=False,
+                perms=self.get_group_perms().value
             )
             return self.conn.getObject("ExperimenterGroup", group_id)
 
