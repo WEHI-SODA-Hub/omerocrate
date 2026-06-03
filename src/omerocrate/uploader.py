@@ -26,8 +26,8 @@ class OmeroPermissions(str, Enum):
     """
     Built-in OMERO permissions categories
     """
-    # Derive from the OMERO GUI
-    # Seems to a compose of Owner + Group + Other
+    # Derived from the OMERO GUI
+    # Seems to be composed of Owner + Group + Other sections.
     # Each section is `r-` for read only, `rw` for read and write, or `ra` for read and annotate
     Private = "rw----"
     ReadOnly = "rwr---"
@@ -387,7 +387,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         This may be overridden by child classes
         """
         # TODO: allow configuration via the metadata
-        return OmeroPermissions.ReadOnly
+        return OmeroPermissions.ReadAnnotate
 
     async def make_group(self) -> gateway.ExperimenterGroupWrapper:
         """
