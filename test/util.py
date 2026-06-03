@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
-from omero.gateway import DatasetWrapper
+from omero.gateway import BlitzObjectWrapper, DatasetWrapper, BlitzGateway, ExperimenterGroupWrapper
 import pytest
 from omerocrate.utils import delete_dataset
-from omero.gateway import BlitzGateway
+from omerocrate.uploader import OmeroPermissions
 from dotenv import get_key
+from omero_model_PermissionsI import PermissionsI
 
 def check_art_dataset(dataset: DatasetWrapper):
     """
@@ -17,6 +18,8 @@ def check_art_dataset(dataset: DatasetWrapper):
         assert "Color Study" in image.name
     delete_dataset(dataset)
 
+def get_dataset_permissions(wrapper: BlitzObjectWrapper) -> PermissionsI:
+    return wrapper.getDetails().getGroup().getDetails().getPermissions()
 
 def check_seg_dataset(dataset: DatasetWrapper, conn: BlitzGateway, check_rois: bool = False,
                       n_rois_expected: int = 0):
