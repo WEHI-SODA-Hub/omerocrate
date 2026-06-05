@@ -18,30 +18,30 @@ async def test_upload_api(
     )
     dataset = await uploader.execute()
     permissions = get_dataset_permissions(dataset)
-    assert str(permissions) == "rwr---"
+    assert str(permissions) == "rwra--"
     check_art_dataset(dataset)
     # Test twice to ensure that the tests work with an existing group
     dataset = await uploader.execute()
     check_art_dataset(dataset)
 
 
-class ReadAnnotateUploader(ApiUploader):
+class ReadWriteUploader(ApiUploader):
     def get_group_perms(self) -> OmeroPermissions:
-        return OmeroPermissions.ReadAnnotate
+        return OmeroPermissions.ReadWrite
 
     def get_group_name(self) -> str:
-        return "Abstract art (ReadAnnotate)"
+        return "Abstract art (ReadWrite)"
 
 
 @pytest.mark.asyncio
-async def test_upload_readannotate(abstract_crate: Path, connection: BlitzGateway):
+async def test_upload_readwrite(abstract_crate: Path, connection: BlitzGateway):
     """
-    Test that a custom uploader can set the group permissions to ReadAnnotate
+    Test that a custom uploader can set the group permissions to ReadWrite
     """
-    uploader = ReadAnnotateUploader(
+    uploader = ReadWriteUploader(
         conn=connection, crate=abstract_crate, segmentation_uploader=None
     )
     dataset = await uploader.execute()
     check_art_dataset(dataset)
     permissions = get_dataset_permissions(dataset)
-    assert str(permissions) == "rwra--"
+    assert str(permissions) == "rwrw--"
