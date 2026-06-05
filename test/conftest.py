@@ -79,4 +79,4 @@ def clean_groups(connection: BlitzGateway):
     group: ExperimenterGroupWrapper
     for group in connection.listGroups():
         if group.getId() not in existing_ids:
-            admin.deleteGroup(omero_model.ExperimenterGroupI(group.getId(), False))
+            admin.deleteGroup(omero_model.ExperimenterGroupI(group.getId()))
