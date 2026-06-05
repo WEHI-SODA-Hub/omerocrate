@@ -6,17 +6,15 @@ from omero.gateway import BlitzGateway
 from util import check_art_dataset, get_dataset_permissions, requires_flower
 
 
-@pytest.mark.parametrize("Uploader", [
-    ApiUploader,
-    pytest.param(TaskqueueUploader, marks=requires_flower)
-])
+@pytest.mark.parametrize(
+    "Uploader", [ApiUploader, pytest.param(TaskqueueUploader, marks=requires_flower)]
+)
 @pytest.mark.asyncio
-async def test_upload_api(abstract_crate: Path, connection: BlitzGateway,
-                          Uploader: type[OmeroUploader]):
+async def test_upload_api(
+    abstract_crate: Path, connection: BlitzGateway, Uploader: type[OmeroUploader]
+):
     uploader = Uploader(
-        conn=connection,
-        crate=abstract_crate,
-        segmentation_uploader=None
+        conn=connection, crate=abstract_crate, segmentation_uploader=None
     )
     dataset = await uploader.execute()
     permissions = get_dataset_permissions(dataset)
@@ -41,9 +39,7 @@ async def test_upload_readannotate(abstract_crate: Path, connection: BlitzGatewa
     Test that a custom uploader can set the group permissions to ReadAnnotate
     """
     uploader = ReadAnnotateUploader(
-        conn=connection,
-        crate=abstract_crate,
-        segmentation_uploader=None
+        conn=connection, crate=abstract_crate, segmentation_uploader=None
     )
     dataset = await uploader.execute()
     check_art_dataset(dataset)

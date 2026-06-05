@@ -2,6 +2,7 @@ from omero.gateway import BlitzGateway
 import os
 from getpass import getuser
 
+
 def from_env() -> BlitzGateway:
     """
     Authenticate to OMERO using environment variables.
@@ -18,5 +19,7 @@ def from_env() -> BlitzGateway:
         passwd=os.environ["OMERO_PASSWORD"],
         host=os.environ["OMERO_HOST"],
         port=os.environ.get("OMERO_PORT", 4064),
-        secure=bool(os.environ.get("OMERO_SECURE", "1").lower() in ("1", "true", "yes")),
+        secure=bool(
+            os.environ.get("OMERO_SECURE", "1").lower() in ("1", "true", "yes")
+        ),
     )
