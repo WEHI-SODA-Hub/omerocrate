@@ -29,9 +29,6 @@ class ReadWriteUploader(ApiUploader):
     def get_group_perms(self) -> OmeroPermissions:
         return OmeroPermissions.ReadWrite
 
-    def get_group_name(self) -> str:
-        return "Abstract art (ReadWrite)"
-
 
 @pytest.mark.asyncio
 async def test_upload_readwrite(abstract_crate: Path, connection: BlitzGateway):
