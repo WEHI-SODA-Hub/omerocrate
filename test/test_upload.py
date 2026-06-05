@@ -11,7 +11,10 @@ from util import check_art_dataset, get_dataset_permissions, requires_flower
 )
 @pytest.mark.asyncio
 async def test_upload_api(
-    abstract_crate: Path, connection: BlitzGateway, Uploader: type[OmeroUploader]
+    abstract_crate: Path,
+    connection: BlitzGateway,
+    clean_groups: None,
+    Uploader: type[OmeroUploader],
 ):
     uploader = Uploader(
         conn=connection, crate=abstract_crate, segmentation_uploader=None
@@ -31,7 +34,9 @@ class ReadWriteUploader(ApiUploader):
 
 
 @pytest.mark.asyncio
-async def test_upload_readwrite(abstract_crate: Path, connection: BlitzGateway):
+async def test_upload_readwrite(
+    abstract_crate: Path, connection: BlitzGateway, clean_groups: None
+):
     """
     Test that a custom uploader can set the group permissions to ReadWrite
     """
