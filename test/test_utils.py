@@ -7,7 +7,9 @@ from omerocrate.utils import uri_to_path
 
 @pytest.fixture
 def demo_graph(abstract_crate: Path) -> Graph:
-    return Graph().parse(source=abstract_crate / "ro-crate-metadata.json", format="json-ld")
+    return Graph().parse(
+        source=abstract_crate / "ro-crate-metadata.json", format="json-ld"
+    )
 
 
 def test_select_first_returns_first_when_multiple(demo_graph: Graph):
@@ -27,6 +29,7 @@ def test_select_first_raises_on_no_results(demo_graph: Graph):
 
 # --- select_many ---
 
+
 def test_select_many_returns_rows(demo_graph: Graph):
     """select_many should yield at least one row for a broad pattern."""
     rows = list(select_many(demo_graph, "SELECT ?s ?p ?o WHERE { ?s ?p ?o }"))
@@ -35,10 +38,12 @@ def test_select_many_returns_rows(demo_graph: Graph):
 
 def test_select_many_returns_empty_when_no_match(demo_graph: Graph):
     """select_many should yield no rows when nothing matches."""
-    rows = list(select_many(
-        demo_graph,
-        "SELECT ?x WHERE { ?x <http://nonexistent.example/predicate> ?o }",
-    ))
+    rows = list(
+        select_many(
+            demo_graph,
+            "SELECT ?x WHERE { ?x <http://nonexistent.example/predicate> ?o }",
+        )
+    )
     assert rows == []
 
 
@@ -49,6 +54,7 @@ def test_select_many_raises_on_non_select_query(demo_graph: Graph):
 
 
 # --- select_one ---
+
 
 def test_select_one_returns_row_when_exactly_one(demo_graph: Graph):
     """select_one should return the single row when exactly one result exists."""
