@@ -1,16 +1,18 @@
+from __future__ import annotations
 from pathlib import Path
 from git import Repo
 import pytest
 from omerocrate.gateway import from_env
 from omero.gateway import (
     BlitzGateway,
-    ProxyObjectWrapper,
-    ExperimenterWrapper,
     ExperimenterGroupWrapper,
 )
-from omero_api_IAdmin_ice import IAdminPrx
+from typing import TYPE_CHECKING
 import dotenv
 import urllib.request
+
+if TYPE_CHECKING:
+    from omero_api_IAdmin_ice import IAdminPrx
 
 
 @pytest.fixture
