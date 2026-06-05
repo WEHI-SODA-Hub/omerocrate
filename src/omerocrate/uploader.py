@@ -68,7 +68,7 @@ class OmeNgffUploader(SegmentationUploader):
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
         if not importlib.util.find_spec("ROI_Converter_NGFF"):
-            raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
+            raise ValueError("ROI_Converter_NGFF must be installed to use the OmeNgffUploader.")
         return self
 
     def process_segmentation(self, segmentation_path: Path, image: gateway.ImageWrapper) -> None:
@@ -133,6 +133,38 @@ class OmeNgffUploader(SegmentationUploader):
         raster.director(args)
 
 
+def select_many(graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> Iterable[ResultRow]:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return all result rows.
+    """
+    result = graph.query(query, initNs=namespaces, initBindings=variables)
+    if result.type != "SELECT":
+        raise ValueError("Only SELECT queries are supported")
+    return cast(Iterable[ResultRow], result)
+
+
+def select_one(graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> ResultRow:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return exactly one result row.
+    Raises ValueError if there are zero or multiple results.
+    """
+    result = list(select_many(graph, query, namespaces, variables))
+    if len(result) != 1:
+        raise ValueError(f"Expected exactly one result, but got {len(result)}")
+    return result[0]
+
+
+def select_first(graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> ResultRow:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return the first result row.
+    Raises ValueError if there are no results.
+    """
+    result = list(select_many(graph, query, namespaces, variables))
+    if len(result) == 0:
+        raise ValueError("Expected at least one result, but got 0")
+    return result[0]
+
+
 class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
     """
     Class that handles the conversion between RO-Crate metadata and OMERO objects.
@@ -173,33 +205,13 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         return Graph().parse(source=self.crate / "ro-crate-metadata.json", format='json-ld')
 
     def select_many(self, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> Iterable[ResultRow]:
-        """
-        Helper method for running a SPARQL query on the RO-Crate metadata that returns multiple results.
-        Typically you don't need to override this method.
-        """
-        result = self.graph.query(
-            query,
-            initNs={
-                **self.namespaces,
-                **namespaces
-            },
-            initBindings={
-                **variables
-            }
-        )
-        if not result.type == "SELECT":
-            raise ValueError("Only SELECT queries are supported")
-        return cast(Iterable[ResultRow], result)
+        return select_many(self.graph, query, {**self.namespaces, **namespaces}, variables)
 
     def select_one(self, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> ResultRow:
-        """
-        Helper method for running a SPARQL query on the RO-Crate metadata that should return exactly one result.
-        Typically you don't need to override this method.
-        """
-        result = list(self.select_many(query, namespaces, variables))
-        if len(result) != 1:
-            raise ValueError(f"Expected exactly one result, but got {len(result)}")
-        return result[0]
+        return select_one(self.graph, query, {**self.namespaces, **namespaces}, variables)
+
+    def select_first(self, query: str, namespaces: Namespaces = {}, variables: Variables = {}) -> ResultRow:
+        return select_first(self.graph, query, {**self.namespaces, **namespaces}, variables)
 
     @cached_property
     def root_dataset_id(self) -> Identifier:
@@ -207,7 +219,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Returns the ID of the root dataset in the crate.
         You shouldn't need to override this method as this function should work for any conformant RO-Crate.
         """
-        result = self.select_one("""
+        result = self.select_first("""
             SELECT ?dataset_id
             WHERE {
                 ?dataset_id a schema:Dataset .
@@ -270,7 +282,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             Path to the segmentation file, or None if no segmentation file is found.
         """
         try:
-            result = self.select_one("""
+            result = self.select_first("""
                 SELECT ?segmentation_file
                 WHERE {
                     ?segmentation_file omerocrate:segmentationFor ?image_path .
@@ -287,7 +299,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """
         dataset = gateway.DatasetWrapper(self.conn, model.DatasetI())
 
-        result = self.select_one("""
+        result = self.select_first("""
             SELECT ?name ?description
             WHERE {
                 ?root schema:name ?name .
@@ -335,7 +347,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Adds metadata to the image object from the crate.
         Can be overridden to add custom metadata.
         """
-        result = self.select_one("""
+        result = self.select_first("""
             SELECT *
             WHERE {
                 OPTIONAL {
@@ -361,7 +373,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         This probably doesn't need to be overridden.
         """
         try:
-            result = self.select_one("""
+            result = self.select_first("""
                 SELECT ?group_name
                 WHERE {
                     ?root omerocrate:experimenterGroup ?group_name .
@@ -370,7 +382,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             return str(result['group_name'])
         except ValueError:
             # If the group name is not specified, use the dataset name
-            result = self.select_one("""
+            result = self.select_first("""
                 SELECT ?name
                 WHERE {
                     ?root schema:name ?name .

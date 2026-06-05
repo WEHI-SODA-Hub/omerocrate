@@ -145,7 +145,7 @@ class UploadRequest(UploadFields):
     )
 
 State = Annotated[Literal[
-    "PENDING", "FAILURE", "STARTED", "SUCCESS", "IMPORT-IN-PROGRESS"
+    "PENDING", "FAILURE", "STARTED", "SUCCESS", "IMPORT-IN-PROGRESS", "RECEIVED"
 ], Field(
     description="The status of the upload task"
 )]
