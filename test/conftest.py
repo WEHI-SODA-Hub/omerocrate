@@ -1,8 +1,11 @@
+from __future__ import annotations
 from pathlib import Path
 from git import Repo
 import pytest
 from omerocrate.gateway import from_env
-from omero.gateway import BlitzGateway
+from omero.gateway import (
+    BlitzGateway,
+)
 import dotenv
 import urllib.request
 
