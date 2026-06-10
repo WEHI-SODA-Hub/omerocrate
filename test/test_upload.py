@@ -3,6 +3,7 @@ import json
 import shutil
 import tempfile
 import pytest
+from rdflib import Graph, Literal, URIRef
 from omerocrate.uploader import ApiUploader, OmeroUploader, OmeroPermissions
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
@@ -71,27 +72,28 @@ async def test_upload_two_image_names(abstract_crate: Path, connection: BlitzGat
         shutil.copytree(abstract_crate, temp_crate)
 
         metadata_path = temp_crate / "ro-crate-metadata.json"
-        with open(metadata_path) as f:
-            crate_data = json.load(f)
+        graph = Graph().parse(metadata_path.as_posix(), format="json-ld")
 
-        for item in crate_data["@graph"]:
-            if item.get("@id") == "concentric.jpg":
-                item["name"] = [
-                    "Color Study. First Name",
-                    "Color Study. Second Name",
-                ]
-                break
+        # Add the second name for the image
+        graph.add(
+            (
+                URIRef("concentric.jpg"),
+                URIRef("http://schema.org/name"),
+                Literal("Second Name"),
+            )
+        )
 
-        with open(metadata_path, "w") as f:
-            json.dump(crate_data, f)
+        with open(metadata_path, "wb") as f:
+            graph.serialize(f, format="json-ld")
 
         uploader = ApiUploader(conn=connection, crate=temp_crate)
         dataset = await uploader.execute()
 
         assert dataset.countChildren() == 1
         for image in dataset.listChildren():
+            # We don't care which name is picked, just that it doesn't raise an error and that the name is one of the two we set
             assert image.name in (
-                "Color Study. First Name",
-                "Color Study. Second Name",
+                "Color Study. Squares with Concentric Circles",
+                "Second Name",
             )
         delete_dataset(dataset)
