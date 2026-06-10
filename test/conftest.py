@@ -5,14 +5,9 @@ import pytest
 from omerocrate.gateway import from_env
 from omero.gateway import (
     BlitzGateway,
-    ExperimenterGroupWrapper,
 )
-from typing import TYPE_CHECKING
 import dotenv
 import urllib.request
-
-if TYPE_CHECKING:
-    from omero_api_IAdmin_ice import IAdminPrx
 
 
 @pytest.fixture

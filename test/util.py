@@ -17,7 +17,6 @@ from omerocrate.utils import delete_dataset
 from dotenv import get_key
 from omero_model_PermissionsI import PermissionsI
 from omero_model_ExperimenterGroupI import ExperimenterGroupI
-from omero import model as omero_model
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
