@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from omero_api_IAdmin_ice import IAdminPrx
 
 
-
 def check_art_dataset(dataset: DatasetWrapper):
     """
     Check if the test dataset has been uploaded correctly

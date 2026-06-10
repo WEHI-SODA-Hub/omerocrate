@@ -63,7 +63,10 @@ async def test_upload_two_image_names(abstract_crate: Path, connection: BlitzGat
     Test that the uploader succeeds when the image node has two schema:name predicates.
     process_image() uses select_first(), so it should pick one name without raising.
     """
-    with tempfile.TemporaryDirectory() as tmp_dir, using_group("Abstract art", connection):
+    with (
+        tempfile.TemporaryDirectory() as tmp_dir,
+        using_group("Abstract art", connection),
+    ):
         temp_crate = Path(tmp_dir) / "crate"
         shutil.copytree(abstract_crate, temp_crate)
 
