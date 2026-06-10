@@ -1,14 +1,27 @@
 import os
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from omero.gateway import (
     BlitzObjectWrapper,
     DatasetWrapper,
     BlitzGateway,
 )
+from omero.rtypes import rstring
+
+# By importing this module, certain fields are populated on the omero module
+import omero.api  # pyright: ignore[reportUnusedImport]
+import omero
 import pytest
 from omerocrate.utils import delete_dataset
 from dotenv import get_key
 from omero_model_PermissionsI import PermissionsI
+from omero_model_ExperimenterGroupI import ExperimenterGroupI
+from omero import model as omero_model
+from typing import TYPE_CHECKING, Generator
+
+if TYPE_CHECKING:
+    from omero_api_IAdmin_ice import IAdminPrx
 
 
 def check_art_dataset(dataset: DatasetWrapper):
@@ -27,6 +40,49 @@ def check_art_dataset(dataset: DatasetWrapper):
 
 def get_dataset_permissions(wrapper: BlitzObjectWrapper) -> PermissionsI:
     return wrapper.getDetails().getGroup().getDetails().getPermissions()
+
+
+def archive_group(group: ExperimenterGroupI, connection: BlitzGateway) -> None:
+    """
+    Removes all members from a group and renames it to ``archived_<uuid>`` so
+    that the original group name can be reused without collision.
+    """
+    admin: IAdminPrx = connection.getAdminService()
+
+    for experimenter in group.linkedExperimenterList():
+        admin.removeGroups(experimenter, [group])
+
+    group.name = rstring(f"archived_{uuid.uuid4().hex}")
+    admin.updateGroup(group)
+
+
+@contextmanager
+def using_group(
+    group_name: str, connection: BlitzGateway
+) -> Generator[None, None, None]:
+    """
+    Context manager that ensures ``group_name`` is free before and after use.
+
+    On entry, any existing groups with ``group_name`` are archived.
+    On exit, any group that was created during the body with ``group_name`` is
+    archived.
+    """
+    admin: IAdminPrx = connection.getAdminService()
+
+    try:
+        existing = admin.lookupGroup(group_name)
+        archive_group(existing, connection)
+    except omero.ApiUsageException:
+        # Group doesn't exist, which is what we want
+        pass
+
+    yield
+
+    try:
+        existing = admin.lookupGroup(group_name)
+        archive_group(existing, connection)
+    except omero.ApiUsageException:
+        pass
 
 
 def check_seg_dataset(

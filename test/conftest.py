@@ -63,20 +63,3 @@ def load_env():
     Load environment variables from .env file for testing.
     """
     dotenv.load_dotenv()
-
-
-@pytest.fixture
-def clean_groups(connection: BlitzGateway):
-    """
-    Deletes any OMERO experimenter groups created during a test.
-    Prevents group name collisions between test runs.
-    """
-    from omero import model as omero_model
-
-    existing_ids = {g.getId() for g in connection.listGroups()}
-    yield
-    admin: IAdminPrx = connection.getAdminService()
-    group: ExperimenterGroupWrapper
-    for group in connection.listGroups():
-        if group.getId() not in existing_ids:
-            admin.deleteGroup(omero_model.ExperimenterGroupI(group.getId()))

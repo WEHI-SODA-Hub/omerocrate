@@ -3,7 +3,12 @@ import pytest
 from omerocrate.uploader import ApiUploader, OmeroUploader, OmeroPermissions
 from omerocrate.taskqueue.upload import TaskqueueUploader
 from omero.gateway import BlitzGateway
-from util import check_art_dataset, get_dataset_permissions, requires_flower
+from util import (
+    check_art_dataset,
+    get_dataset_permissions,
+    requires_flower,
+    using_group,
+)
 
 
 @pytest.mark.parametrize(
@@ -13,19 +18,19 @@ from util import check_art_dataset, get_dataset_permissions, requires_flower
 async def test_upload_api(
     abstract_crate: Path,
     connection: BlitzGateway,
-    clean_groups: None,
     Uploader: type[OmeroUploader],
 ):
-    uploader = Uploader(
-        conn=connection, crate=abstract_crate, segmentation_uploader=None
-    )
-    dataset = await uploader.execute()
-    permissions = get_dataset_permissions(dataset)
-    assert str(permissions) == "rwra--"
-    check_art_dataset(dataset)
-    # Test twice to ensure that the tests work with an existing group
-    dataset = await uploader.execute()
-    check_art_dataset(dataset)
+    with using_group("Abstract art", connection):
+        uploader = Uploader(
+            conn=connection, crate=abstract_crate, segmentation_uploader=None
+        )
+        dataset = await uploader.execute()
+        permissions = get_dataset_permissions(dataset)
+        assert str(permissions) == "rwra--"
+        check_art_dataset(dataset)
+        # Test twice to ensure that the tests work with an existing group
+        dataset = await uploader.execute()
+        check_art_dataset(dataset)
 
 
 class ReadWriteUploader(ApiUploader):
@@ -34,16 +39,15 @@ class ReadWriteUploader(ApiUploader):
 
 
 @pytest.mark.asyncio
-async def test_upload_readwrite(
-    abstract_crate: Path, connection: BlitzGateway, clean_groups: None
-):
+async def test_upload_readwrite(abstract_crate: Path, connection: BlitzGateway):
     """
     Test that a custom uploader can set the group permissions to ReadWrite
     """
-    uploader = ReadWriteUploader(
-        conn=connection, crate=abstract_crate, segmentation_uploader=None
-    )
-    dataset = await uploader.execute()
-    check_art_dataset(dataset)
-    permissions = get_dataset_permissions(dataset)
-    assert str(permissions) == "rwrw--"
+    with using_group("Abstract art", connection):
+        uploader = ReadWriteUploader(
+            conn=connection, crate=abstract_crate, segmentation_uploader=None
+        )
+        dataset = await uploader.execute()
+        check_art_dataset(dataset)
+        permissions = get_dataset_permissions(dataset)
+        assert str(permissions) == "rwrw--"
