@@ -49,9 +49,6 @@ class TestSelectMany:
             list(select_many(demo_graph, "ASK { ?s ?p ?o }"))
 
 
-# --- select_one ---
-
-
 class TestSelectOne:
     def test_returns_row_when_exactly_one(self, demo_graph: Graph):
         """select_one should return the single row when exactly one result exists."""
