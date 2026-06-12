@@ -175,7 +175,9 @@ def select_one(
     """
     result = list(select_many(graph, query, namespaces, variables))
     if len(result) != 1:
-        raise ValueError(f"Expected exactly one result, but got {len(result)}")
+        raise ValueError(
+            f"For query '{query}', expected exactly one result, but got {len(result)}"
+        )
     return result[0]
 
 
@@ -191,7 +193,9 @@ def select_first(
     """
     result = list(select_many(graph, query, namespaces, variables))
     if len(result) == 0:
-        raise ValueError("Expected at least one result, but got 0")
+        raise ValueError(
+            f"For query '{query}', expected at least one result, but got 0"
+        )
     return result[0]
 
 
@@ -552,7 +556,9 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             for img_id in existing_img_ids:
                 img = self.conn.getObject("Image", img_id)
                 if img is None:
-                    raise ValueError(f"Image with ID {img_id} not found")
+                    raise ValueError(
+                        f"Image with ID {img_id} not found in OMERO. Are the ome:ImageID values in the metadata correct?"
+                    )
 
                 img_dataset = img.getParent()
                 if img_dataset is None:
