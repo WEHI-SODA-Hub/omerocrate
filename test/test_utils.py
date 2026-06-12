@@ -20,7 +20,7 @@ class TestSelectFirst:
 
     def test_raises_on_no_results(self, demo_graph: Graph):
         """select_first should raise ValueError when the query returns no rows."""
-        with pytest.raises(ValueError, match="Expected at least one result"):
+        with pytest.raises(ValueError, match="expected at least one result"):
             select_first(
                 demo_graph,
                 "SELECT ?x WHERE { ?x <http://nonexistent.example/predicate> ?o }",
@@ -61,7 +61,7 @@ class TestSelectOne:
 
     def test_raises_on_zero_results(self, demo_graph: Graph):
         """select_one should raise ValueError when the query returns no rows."""
-        with pytest.raises(ValueError, match="Expected exactly one result, but got 0"):
+        with pytest.raises(ValueError, match="expected exactly one result, but got 0"):
             select_one(
                 demo_graph,
                 "SELECT ?x WHERE { ?x <http://nonexistent.example/predicate> ?o }",
@@ -69,7 +69,7 @@ class TestSelectOne:
 
     def test_raises_on_multiple_results(self, demo_graph: Graph):
         """select_one should raise ValueError when the query returns more than one row."""
-        with pytest.raises(ValueError, match="Expected exactly one result, but got"):
+        with pytest.raises(ValueError, match="expected exactly one result, but got"):
             select_one(demo_graph, "SELECT ?s ?p ?o WHERE { ?s ?p ?o }")
 
 
