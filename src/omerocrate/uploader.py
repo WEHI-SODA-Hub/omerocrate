@@ -149,19 +149,25 @@ class OmeNgffUploader(SegmentationUploader):
 
 
 def select_many(
-    graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
 ) -> Iterable[ResultRow]:
     """
     Run a SPARQL SELECT query on an RDF graph and return all result rows.
     """
-    result = graph.query(query, initNs=namespaces, initBindings=variables)
+    result = graph.query(query, initNs=namespaces or {}, initBindings=variables or {})
     if result.type != "SELECT":
         raise ValueError("Only SELECT queries are supported")
     return cast(Iterable[ResultRow], result)
 
 
 def select_one(
-    graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
 ) -> ResultRow:
     """
     Run a SPARQL SELECT query on an RDF graph and return exactly one result row.
@@ -174,7 +180,10 @@ def select_one(
 
 
 def select_first(
-    graph: Graph, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
 ) -> ResultRow:
     """
     Run a SPARQL SELECT query on an RDF graph and return the first result row.
@@ -231,24 +240,33 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         )
 
     def select_many(
-        self, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
     ) -> Iterable[ResultRow]:
         return select_many(
-            self.graph, query, {**self.namespaces, **namespaces}, variables
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
         )
 
     def select_one(
-        self, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
     ) -> ResultRow:
         return select_one(
-            self.graph, query, {**self.namespaces, **namespaces}, variables
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
         )
 
     def select_first(
-        self, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
     ) -> ResultRow:
         return select_first(
-            self.graph, query, {**self.namespaces, **namespaces}, variables
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
         )
 
     @cached_property
@@ -501,13 +519,13 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-        img_uris, img_paths = list(zip(*self.find_images()))
+        img_uris, img_paths = list(zip(*self.find_images(), strict=False))
 
         existing_images = list(self.find_existing_images(img_uris))
         existing_img_uris: list[URIRef]
         existing_img_ids: list[int]
         existing_img_uris, existing_img_ids = (
-            list(zip(*existing_images)) if existing_images else ([], [])
+            list(zip(*existing_images, strict=False)) if existing_images else ([], [])
         )
 
         # Filter out images that already exist
@@ -516,7 +534,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         ]
         new_img_paths: list[Path] = [
             path
-            for uri, path in zip(img_uris, img_paths)
+            for uri, path in zip(img_uris, img_paths, strict=False)
             if uri not in existing_img_uris
         ]
 
@@ -562,7 +580,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         new_img_wrappers = [
             img async for img in self.upload_images(new_img_paths, dataset)
         ]
-        for wrapper, uri in zip(new_img_wrappers, new_img_uris):
+        for wrapper, uri in zip(new_img_wrappers, new_img_uris, strict=False):
             self.process_image(uri, wrapper)
             if self.segmentation_uploader is None:
                 continue
@@ -572,7 +590,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
         # Upload only segmentations for existing images
         if self.segmentation_uploader is not None and len(existing_img_uris) > 0:
-            for img_id, uri in zip(existing_img_ids, existing_img_uris):
+            for img_id, uri in zip(existing_img_ids, existing_img_uris, strict=False):
                 seg = self.find_segmentation_for_image(uri)
                 if seg:
                     wrapper = self.conn.getObject("Image", img_id)
