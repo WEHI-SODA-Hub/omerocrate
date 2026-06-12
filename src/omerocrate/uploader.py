@@ -28,6 +28,7 @@ class OmeroPermissions(str, Enum):
     Built-in OMERO permissions categories
     """
 
+    # Derived from the OMERO GUI
     # Seems to be composed of Owner + Group + Other sections.
     # Each section is `r-` for read only, `rw` for read and write, or `ra` for read and annotate
     Private = "rw----"
@@ -75,7 +76,9 @@ class OmeNgffUploader(SegmentationUploader):
     @model_validator(mode="after")
     def check_dependencies(self) -> Self:
         if not importlib.util.find_spec("ROI_Converter_NGFF"):
-            raise ValueError("ROI_Converter_NGFF is required for OmeNgffUploader.")
+            raise ValueError(
+                "ROI_Converter_NGFF must be installed to use the OmeNgffUploader."
+            )
         return self
 
     def process_segmentation(
@@ -145,6 +148,57 @@ class OmeNgffUploader(SegmentationUploader):
         raster.director(args)
 
 
+def select_many(
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
+) -> Iterable[ResultRow]:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return all result rows.
+    """
+    result = graph.query(query, initNs=namespaces or {}, initBindings=variables or {})
+    if result.type != "SELECT":
+        raise ValueError("Only SELECT queries are supported")
+    return cast(Iterable[ResultRow], result)
+
+
+def select_one(
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
+) -> ResultRow:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return exactly one result row.
+    Raises ValueError if there are zero or multiple results.
+    """
+    result = list(select_many(graph, query, namespaces, variables))
+    if len(result) != 1:
+        raise ValueError(
+            f"For query '{query}', expected exactly one result, but got {len(result)}"
+        )
+    return result[0]
+
+
+def select_first(
+    graph: Graph,
+    query: str,
+    namespaces: Namespaces | None = None,
+    variables: Variables | None = None,
+) -> ResultRow:
+    """
+    Run a SPARQL SELECT query on an RDF graph and return the first result row.
+    Raises ValueError if there are no results.
+    """
+    result = list(select_many(graph, query, namespaces, variables))
+    if len(result) == 0:
+        raise ValueError(
+            f"For query '{query}', expected at least one result, but got 0"
+        )
+    return result[0]
+
+
 class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
     """
     Class that handles the conversion between RO-Crate metadata and OMERO objects.
@@ -190,30 +244,34 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         )
 
     def select_many(
-        self, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
     ) -> Iterable[ResultRow]:
-        """
-        Helper method for running a SPARQL query on the RO-Crate metadata that returns multiple results.
-        Typically you don't need to override this method.
-        """
-        result = self.graph.query(
-            query, initNs={**self.namespaces, **namespaces}, initBindings={**variables}
+        return select_many(
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
         )
-        if not result.type == "SELECT":
-            raise ValueError("Only SELECT queries are supported")
-        return cast(Iterable[ResultRow], result)
 
     def select_one(
-        self, query: str, namespaces: Namespaces = {}, variables: Variables = {}
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
     ) -> ResultRow:
-        """
-        Helper method for running a SPARQL query on the RO-Crate metadata that should return exactly one result.
-        Typically you don't need to override this method.
-        """
-        result = list(self.select_many(query, namespaces, variables))
-        if len(result) != 1:
-            raise ValueError(f"Expected exactly one result, but got {len(result)}")
-        return result[0]
+        return select_one(
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
+        )
+
+    def select_first(
+        self,
+        query: str,
+        namespaces: Namespaces | None = None,
+        variables: Variables | None = None,
+    ) -> ResultRow:
+        return select_first(
+            self.graph, query, {**self.namespaces, **(namespaces or {})}, variables
+        )
 
     @cached_property
     def root_dataset_id(self) -> Identifier:
@@ -221,7 +279,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Returns the ID of the root dataset in the crate.
         You shouldn't need to override this method as this function should work for any conformant RO-Crate.
         """
-        result = self.select_one("""
+        result = self.select_first("""
             SELECT ?dataset_id
             WHERE {
                 ?dataset_id a schema:Dataset .
@@ -286,7 +344,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             Path to the segmentation file, or None if no segmentation file is found.
         """
         try:
-            result = self.select_one(
+            result = self.select_first(
                 """
                 SELECT ?segmentation_file
                 WHERE {
@@ -308,7 +366,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """
         dataset = gateway.DatasetWrapper(self.conn, model.DatasetI())
 
-        result = self.select_one(
+        result = self.select_first(
             """
             SELECT ?name ?description
             WHERE {
@@ -365,7 +423,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Adds metadata to the image object from the crate.
         Can be overridden to add custom metadata.
         """
-        result = self.select_one(
+        result = self.select_first(
             """
             SELECT *
             WHERE {
@@ -394,7 +452,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         This probably doesn't need to be overridden.
         """
         try:
-            result = self.select_one(
+            result = self.select_first(
                 """
                 SELECT ?group_name
                 WHERE {
@@ -406,7 +464,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             return str(result["group_name"])
         except ValueError:
             # If the group name is not specified, use the dataset name
-            result = self.select_one(
+            result = self.select_first(
                 """
                 SELECT ?name
                 WHERE {
@@ -465,13 +523,13 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         self.connect()
         img_uris: list[URIRef]
         img_paths: list[Path]
-        img_uris, img_paths = list(zip(*self.find_images()))
+        img_uris, img_paths = list(zip(*self.find_images(), strict=False))
 
         existing_images = list(self.find_existing_images(img_uris))
         existing_img_uris: list[URIRef]
         existing_img_ids: list[int]
         existing_img_uris, existing_img_ids = (
-            list(zip(*existing_images)) if existing_images else ([], [])
+            list(zip(*existing_images, strict=False)) if existing_images else ([], [])
         )
 
         # Filter out images that already exist
@@ -480,7 +538,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         ]
         new_img_paths: list[Path] = [
             path
-            for uri, path in zip(img_uris, img_paths)
+            for uri, path in zip(img_uris, img_paths, strict=False)
             if uri not in existing_img_uris
         ]
 
@@ -498,7 +556,9 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
             for img_id in existing_img_ids:
                 img = self.conn.getObject("Image", img_id)
                 if img is None:
-                    raise ValueError(f"Image with ID {img_id} not found")
+                    raise ValueError(
+                        f"Image with ID {img_id} not found in OMERO. Are the ome:ImageID values in the metadata correct?"
+                    )
 
                 img_dataset = img.getParent()
                 if img_dataset is None:
@@ -526,7 +586,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         new_img_wrappers = [
             img async for img in self.upload_images(new_img_paths, dataset)
         ]
-        for wrapper, uri in zip(new_img_wrappers, new_img_uris):
+        for wrapper, uri in zip(new_img_wrappers, new_img_uris, strict=False):
             self.process_image(uri, wrapper)
             if self.segmentation_uploader is None:
                 continue
@@ -536,7 +596,7 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
 
         # Upload only segmentations for existing images
         if self.segmentation_uploader is not None and len(existing_img_uris) > 0:
-            for img_id, uri in zip(existing_img_ids, existing_img_uris):
+            for img_id, uri in zip(existing_img_ids, existing_img_uris, strict=False):
                 seg = self.find_segmentation_for_image(uri)
                 if seg:
                     wrapper = self.conn.getObject("Image", img_id)

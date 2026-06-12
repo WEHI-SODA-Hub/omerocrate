@@ -46,3 +46,7 @@ dev = [
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
+
+[tool.ruff.lint]
+# On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`)
+select = ["E4", "E7", "E9", "F", "B"]
