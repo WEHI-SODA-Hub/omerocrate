@@ -16,13 +16,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def log_request(request: httpx.Request) -> None:
     """
     Logs the request details.
     """
     logger.debug(f"Request: {request.method} {request.url}")
     logger.debug(f"Request headers: {request.headers}")
-    logger.debug(f"Request body: {request.content.decode('utf-8') if request.content else None}")
+    logger.debug(
+        f"Request body: {request.content.decode('utf-8') if request.content else None}"
+    )
+
 
 def log_response(response: httpx.Response, request: bool = True) -> None:
     """
@@ -34,13 +38,24 @@ def log_response(response: httpx.Response, request: bool = True) -> None:
     if request:
         log_request(response.request)
 
+
 class TaskqueueUploader(OmeroUploader):
     """
     Subclass of OmeroUploader that uses `gs-taskqueue` to upload images to OMERO.
     """
-    host: str = Field(default_factory=lambda: os.environ["FLOWER_HOST"], description="Host of the Flower API server")
-    username: str = Field(default_factory=lambda: os.environ["FLOWER_USER"], description="Username for the Flower API server")
-    password: str = Field(default_factory=lambda: os.environ["FLOWER_PASSWORD"], description="Password for the Flower API server")
+
+    host: str = Field(
+        default_factory=lambda: os.environ["FLOWER_HOST"],
+        description="Host of the Flower API server",
+    )
+    username: str = Field(
+        default_factory=lambda: os.environ["FLOWER_USER"],
+        description="Username for the Flower API server",
+    )
+    password: str = Field(
+        default_factory=lambda: os.environ["FLOWER_PASSWORD"],
+        description="Password for the Flower API server",
+    )
 
     @computed_field
     @property
@@ -51,11 +66,13 @@ class TaskqueueUploader(OmeroUploader):
         return httpx.AsyncClient(
             auth=(self.username, self.password),
             # Support local certificate stores
-            verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
         )
 
-    async def upload_images(self, image_paths: list[Path], dataset: gateway.DatasetWrapper, **kwargs: Any) -> AsyncIterable[gateway.ImageWrapper]:
-        # We create a dummy project, because `gs-taskqueue` requires one. 
+    async def upload_images(
+        self, image_paths: list[Path], dataset: gateway.DatasetWrapper, **kwargs: Any
+    ) -> AsyncIterable[gateway.ImageWrapper]:
+        # We create a dummy project, because `gs-taskqueue` requires one.
         # This makes it easy delete it afterwards
         project = gateway.ProjectWrapper(self.conn, model.ProjectI())
         project.setName(str(uuid4()))
@@ -63,16 +80,22 @@ class TaskqueueUploader(OmeroUploader):
         project._linkObject(dataset, "ProjectDatasetLinkI")
 
         req = upload_models.UploadRequest(
-            project=[upload_models.ProjectRequest(
-                object_id=project.getId(),
-                dataset=[upload_models.DatasetRequest(
-                    object_id=dataset.getId(),
-                    image=[upload_models.ImageRequest(
-                        name=str(uuid4()),
-                        file_path=str(path)
-                    ) for path in image_paths]
-                )]
-            )],
+            project=[
+                upload_models.ProjectRequest(
+                    object_id=project.getId(),
+                    dataset=[
+                        upload_models.DatasetRequest(
+                            object_id=dataset.getId(),
+                            image=[
+                                upload_models.ImageRequest(
+                                    name=str(uuid4()), file_path=str(path)
+                                )
+                                for path in image_paths
+                            ],
+                        )
+                    ],
+                )
+            ],
             # Upload into the same group as the dataset
             group=dataset.getDetails().getGroup().getName(),
             import_user=os.environ["OMERO_USER"],
@@ -89,7 +112,9 @@ class TaskqueueUploader(OmeroUploader):
         errors = list(self.error_from_result(result))
         if len(errors) > 0:
             error_messages = "\n".join(errors)
-            raise Exception(f"Upload failed: {error_messages}\nFull JSON\n: {result.model_dump_json(indent=4)}")
+            raise Exception(
+                f"Upload failed: {error_messages}\nFull JSON\n: {result.model_dump_json(indent=4)}"
+            )
 
         # Unlink and delete the project, since we never wanted it
         for link in project.getChildLinks():
@@ -122,12 +147,14 @@ class TaskqueueUploader(OmeroUploader):
                         if image.import_status == "FAILED" or image.error is not None:
                             yield f"Image {image.file_path} upload failed with error {image.error}."
 
-    async def upload_to_omero(self, upload: upload_models.UploadRequest) -> upload_models.UploadReponse:
+    async def upload_to_omero(
+        self, upload: upload_models.UploadRequest
+    ) -> upload_models.UploadReponse:
         """
         Submits the upload request to the Flower API server and returns the API response.
         """
         response = await self.client.post(
-            f"{self.host}/flower/api/task/send-task/gs_import_run_omero_import" ,
+            f"{self.host}/flower/api/task/send-task/gs_import_run_omero_import",
             json={"args": [upload.model_dump(exclude_none=True)]},
         )
         log_response(response, request=True)
@@ -138,7 +165,7 @@ class TaskqueueUploader(OmeroUploader):
         """
         Checks the status of an upload task.
         """
-        URL_CHECK_INFO = f"{self.host}/flower/api/task/info/{task_id}" 
+        URL_CHECK_INFO = f"{self.host}/flower/api/task/info/{task_id}"
 
         # Check the task status
         response = await self.client.get(
@@ -147,7 +174,7 @@ class TaskqueueUploader(OmeroUploader):
         log_response(response, request=True)
         response.raise_for_status()
         return upload_models.UploadStatus.model_validate(response.json())
-        
+
     async def upload_result(self, task_id: str) -> upload_models.UploadResultSet:
         """
         Gets the result of a completed upload task.
@@ -157,7 +184,7 @@ class TaskqueueUploader(OmeroUploader):
         )
         log_response(response, request=True)
         response.raise_for_status()
-        
+
         try:
             return upload_models.UploadResultSet.model_validate(response.json())
         except ValidationError as e:
