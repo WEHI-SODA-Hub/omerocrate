@@ -6,11 +6,9 @@ from omero.gateway import BlitzGateway
 import dotenv
 import urllib.request
 
-
 @pytest.fixture
 def abstract_crate() -> Path:
     return Path(__file__).parent / "demo_crate"
-
 
 @pytest.fixture
 def ca_imaging() -> Path:
@@ -19,11 +17,9 @@ def ca_imaging() -> Path:
         Repo.clone_from("https://github.com/SFB-ELAINE/Ca-imaging-RO-Crate", out)
     return out
 
-
 @pytest.fixture
 def ca_imaging_1021(ca_imaging: Path) -> Path:
     return ca_imaging / "ro-crate_1021"
-
 
 @pytest.fixture
 def nuclear_image() -> Path:
@@ -33,11 +29,9 @@ def nuclear_image() -> Path:
         urllib.request.urlretrieve(url, out / "nuclear_image.tif")
     return out
 
-
 @pytest.fixture
 def wholecell_segmentation() -> Path:
     return Path(__file__).parent / "demo_segmentation_with_imageid"
-
 
 @pytest.fixture
 def connection() -> BlitzGateway:
@@ -47,7 +41,6 @@ def connection() -> BlitzGateway:
     conn = from_env()
     conn.connect()
     return conn
-
 
 @pytest.fixture(autouse=True)
 def load_env():

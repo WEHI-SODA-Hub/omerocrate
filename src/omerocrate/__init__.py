@@ -7,5 +7,5 @@ __all__ = [
     "SegmentationUploader",
     "OmeNgffUploader",
     "TaskqueueUploader",
-    "from_env",
+    "from_env"
 ]
