@@ -246,7 +246,11 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         Returns:
             Yields tuples of (image URI, image ID).
         """
-        uri_values = " ".join(f"<{str(uri)}>" for uri in image_list)
+        if len(image_list) == 0:
+            # Short circuit to avoid running invalid SPARQL query with empty IN clause
+            return
+
+        uri_values = ", ".join(f"<{str(uri)}>" for uri in image_list)
 
         for result in self.select_many(f"""
             SELECT ?file_path ?image_id
