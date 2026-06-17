@@ -9,12 +9,18 @@ from util import check_art_dataset, get_dataset_permissions, requires_flower
 @pytest.mark.parametrize(
     "Uploader", [ApiUploader, pytest.param(TaskqueueUploader, marks=requires_flower)]
 )
+@pytest.mark.parametrize(
+    "crate_path", [
+        Path(__file__).parent / "multi_image_abstract",
+        Path(__file__).parent / "demo_crate"
+    ]
+)
 @pytest.mark.asyncio
 async def test_upload_api(
-    abstract_crate: Path, connection: BlitzGateway, Uploader: type[OmeroUploader]
+    crate_path: Path, connection: BlitzGateway, Uploader: type[OmeroUploader]
 ):
     uploader = Uploader(
-        conn=connection, crate=abstract_crate, segmentation_uploader=None
+        conn=connection, crate=crate_path, segmentation_uploader=None
     )
     dataset = await uploader.execute()
     permissions = get_dataset_permissions(dataset)
