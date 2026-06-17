@@ -127,7 +127,10 @@ class TaskqueueUploader(OmeroUploader):
             for project in upload.project:
                 for result_dataset in project.dataset:
                     for image in result_dataset.image:
-                        if image.object_id is not None:
+                        if isinstance(image.object_id, list):
+                            for object_id in image.object_id:
+                                yield self.conn.getObject("Image", object_id)
+                        elif image.object_id is not None:
                             yield self.conn.getObject("Image", image.object_id)
 
     def error_from_result(self, result: upload_models.UploadResultSet) -> Iterable[str]:
