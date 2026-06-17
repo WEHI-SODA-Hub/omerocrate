@@ -43,13 +43,13 @@ async def test_upload_api(
 )
 @pytest.mark.asyncio
 async def test_upload_multi_image(
-    abstract_crate: Path,
+    multi_image_abstract_crate: Path,
     connection: BlitzGateway,
     Uploader: type[OmeroUploader],
 ):
     with using_group("Multi Image Abstract Art", connection):
         uploader = Uploader(
-            conn=connection, crate=abstract_crate, segmentation_uploader=None
+            conn=connection, crate=multi_image_abstract_crate, segmentation_uploader=None
         )
         dataset = await uploader.execute()
         permissions = get_dataset_permissions(dataset)
