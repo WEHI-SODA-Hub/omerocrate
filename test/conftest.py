@@ -1,8 +1,11 @@
+from __future__ import annotations
 from pathlib import Path
 from git import Repo
 import pytest
 from omerocrate.gateway import from_env
-from omero.gateway import BlitzGateway
+from omero.gateway import (
+    BlitzGateway,
+)
 import dotenv
 import urllib.request
 
@@ -11,9 +14,11 @@ import urllib.request
 def abstract_crate() -> Path:
     return Path(__file__).parent / "demo_crate"
 
+
 @pytest.fixture
 def multi_image_abstract_crate() -> Path:
     return Path(__file__).parent / "multi_image_abstract"
+
 
 @pytest.fixture
 def ca_imaging() -> Path:

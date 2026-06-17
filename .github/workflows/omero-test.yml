@@ -32,6 +32,12 @@ jobs:
       run: |
         uv venv
         uv sync --all-extras
+
+    - name: ruff format check
+      run: uv run ruff format --check .
+
+    - name: ruff lint
+      run: uv run ruff check . || true
     
     - name: Clone OMERO test infrastructure
       uses: actions/checkout@v4
