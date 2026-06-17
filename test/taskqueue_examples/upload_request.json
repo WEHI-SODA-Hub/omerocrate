@@ -1,0 +1,122 @@
+[
+    {
+        "group": "My OMERO Group",
+        "importUser": "emil.rozbicki",
+        "project": [
+            {
+                "name": "My Project",
+                "description": "Project desciption",
+                "keyValues": [
+                    [
+                        "Study Id",
+                        "ABC-17"
+                    ]
+                ],
+                "tag": [
+                    [
+                        "Studies",
+                        "ABC-17"
+                    ]
+                ],
+                "dataset": [
+                    {
+                        "name": "My Dataset",
+                        "description": "",
+                        "keyValues": [
+                            [
+                                "Species",
+                                "Human - Homo Sapiens"
+                            ],
+                            [
+                                "Organ",
+                                "Placenta"
+                            ]
+                        ],
+                        "tag": [
+                            [
+                                "Orangs",
+                                "Placenta"
+                            ],
+                            [
+                                "Species",
+                                "Human - Homo Sapiens"
+                            ]
+                        ],
+                        "image": [
+                            {
+                                "name": "B21-201 Placenta 1st trim FFPE",
+                                "description": "Image description",
+                                "keyValues": [
+                                    [
+                                        "Scan ID",
+                                        "112233"
+                                    ],
+                                    [
+                                        "External Unique ID",
+                                        332211
+                                    ],
+                                    [
+                                        "Species",
+                                        "Human - Homo Sapiens"
+                                    ],
+                                    [
+                                        "Organ",
+                                        "Placenta"
+                                    ],
+                                    [
+                                        "Tissue region",
+                                        "Placenta"
+                                    ],
+                                    [
+                                        "Disease",
+                                        "Normal"
+                                    ],
+                                    [
+                                        "Treatment",
+                                        "Untreated"
+                                    ]
+                                ],
+                                "filePath": "/example/data/storage/Image_1.ome.tiff",
+                                "tag": [
+                                    [
+                                        "Disease",
+                                        "Normal"
+                                    ]
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "group": "Glencoe Software",
+        "importUser": "emil.rozbicki",
+        "project": [
+            {
+                "name": "project_name",
+                "description": "Project-level description",
+                "keyValues": [],
+                "tag": [],
+                "dataset": [
+                    {
+                        "name": "dataset_name",
+                        "description": "Dataset-level description",
+                        "keyValues": [],
+                        "tag": [],
+                        "image": [
+                            {
+                                "name": "file_name",
+                                "description": "Image-level description",
+                                "keyValues": [],
+                                "tag": [],
+                                "filePath": "/example/data/storage/Image_1.ome.tiff"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

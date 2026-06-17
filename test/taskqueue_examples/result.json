@@ -1,0 +1,57 @@
+[
+    {
+        "task-id": "1a37bd7d-3316-4778-9340-179652f9663c",
+        "state": "SUCCESS",
+        "result": [
+            {
+                "group": "2026-00002",
+                "importUser": "omero-import",
+                "project": [
+                    {
+                        "objectId": 439,
+                        "keyValues": [],
+                        "tag": [],
+                        "dataset": [
+                            {
+                                "objectId": 985,
+                                "keyValues": [],
+                                "tag": [],
+                                "image": [
+                                    {
+                                        "name": "bf3a0e79-c97b-4eda-9b3a-df96b60b8330",
+                                        "filePath": "XXX.vsi",
+                                        "keyValues": [],
+                                        "tag": [],
+                                        "importStatus": "SUCCEEDED",
+                                        "importSummary": {
+                                            "number_of_files": "1",
+                                            "number_of_omero_images": "3",
+                                            "number_of_errors": "0",
+                                            "importer_time": "0:00:01.131",
+                                            "error": null,
+                                            "exception": null,
+                                            "file_exists": null,
+                                            "clientpath": null,
+                                            "plateId": null,
+                                            "imageId": "747,748,749",
+                                            "time": "0.06 min"
+                                        },
+                                        "objectId": [
+                                            747,
+                                            748,
+                                            749
+                                        ],
+                                        "filesetId": "747"
+                                    }
+                                ],
+                                "importStatus": "SUCCEEDED"
+                            }
+                        ],
+                        "importStatus": "SUCCEEDED"
+                    }
+                ],
+                "importStatus": "SUCCEEDED"
+            }
+        ]
+    }
+]
