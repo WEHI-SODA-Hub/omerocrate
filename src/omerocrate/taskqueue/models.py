@@ -4,7 +4,7 @@ Models for parsing and serializing data structures used in `gs-taskqueue`
 
 from __future__ import annotations
 from datetime import datetime
-from typing import List, Any, Annotated, Literal, Optional, Union
+from typing import List, Any, Annotated, Literal, Optional, TypeAlias, Union
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, AliasChoices
 
 
@@ -45,11 +45,10 @@ CommaSeparatedIds = Annotated[
     List[OmeroId],
     BeforeValidator(parse_comma_separated),
 ]
-#: An OMERO ID whose field name is objectId
-ObjectId = Annotated[
-    OmeroId,
-    Field(validation_alias=AliasChoices("objectId", "object_id"), alias="objectId"),
-]
+#: A field whose field name is objectId
+ObjectIdField = Field(
+    validation_alias=AliasChoices("objectId", "object_id"), alias="objectId"
+)
 
 
 class TaskQueueBase(BaseModel):
@@ -93,7 +92,7 @@ class DatasetFields(TaskQueueBase):
     """
 
     name: Annotated[Optional[str], Field(description="Dataset name")] = None
-    object_id: ObjectId = None
+    object_id: Annotated[int | None, ObjectIdField] = None
     description: Annotated[Optional[str], Field(description="Dataset description")] = (
         None
     )
@@ -124,7 +123,7 @@ class ProjectFields(TaskQueueBase):
     """
 
     name: Annotated[Optional[str], Field(description="Project name")] = None
-    object_id: ObjectId = None
+    object_id: Annotated[int | None, ObjectIdField] = None
     description: Annotated[Optional[str], Field(description="Project description")] = (
         None
     )
@@ -292,7 +291,7 @@ class ImageResponse(ImageRequest):
     import_summary: Annotated[
         Union[ImportSummary, str, None], Field(alias="importSummary")
     ] = None
-    object_id: ObjectId | list[ObjectId] = None
+    object_id: Annotated[int | list[int], ObjectIdField]
     fileset_id: Annotated[OmeroId, Field(alias="filesetId")] = None
     error: Error = None
 
