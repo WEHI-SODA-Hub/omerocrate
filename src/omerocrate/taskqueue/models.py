@@ -27,12 +27,23 @@ def parse_object_id(value: str | int | list | None) -> int | None:
         return int(value)
 
 
+def parse_comma_separated(value: str) -> list[str]:
+    """
+    Parse a comma-separated string into a list of strings
+    """
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
 KeyValue = tuple[str, Any]
 Error = Annotated[
     Optional[str], Field(description="Error message if the task failed", default=None)
 ]
 OmeroId = Annotated[
     Optional[int], Field(description="Some OMERO ID"), BeforeValidator(parse_object_id)
+]
+CommaSeparatedIds = Annotated[
+    List[OmeroId],
+    BeforeValidator(parse_comma_separated),
 ]
 #: An OMERO ID whose field name is objectId
 ObjectId = Annotated[
@@ -254,7 +265,7 @@ class ImportSummary(TaskQueueBase):
         ),
     ]
     image_id: Annotated[
-        OmeroId,
+        OmeroId | CommaSeparatedIds,
         Field(
             alias="imageId",
         ),
@@ -281,7 +292,7 @@ class ImageResponse(ImageRequest):
     import_summary: Annotated[
         Union[ImportSummary, str, None], Field(alias="importSummary")
     ] = None
-    object_id: ObjectId = None
+    object_id: ObjectId | list[ObjectId] = None
     fileset_id: Annotated[OmeroId, Field(alias="filesetId")] = None
     error: Error = None
 
