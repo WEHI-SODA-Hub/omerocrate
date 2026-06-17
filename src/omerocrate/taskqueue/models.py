@@ -4,7 +4,7 @@ Models for parsing and serializing data structures used in `gs-taskqueue`
 
 from __future__ import annotations
 from datetime import datetime
-from typing import List, Any, Annotated, Literal, Optional, Union
+from typing import List, Any, Annotated, Literal, Optional, TypeAlias, Union
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, AliasChoices
 
 
@@ -27,6 +27,13 @@ def parse_object_id(value: str | int | list | None) -> int | None:
         return int(value)
 
 
+def parse_comma_separated(value: str) -> list[str]:
+    """
+    Parse a comma-separated string into a list of strings
+    """
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
 KeyValue = tuple[str, Any]
 Error = Annotated[
     Optional[str], Field(description="Error message if the task failed", default=None)
@@ -34,11 +41,14 @@ Error = Annotated[
 OmeroId = Annotated[
     Optional[int], Field(description="Some OMERO ID"), BeforeValidator(parse_object_id)
 ]
-#: An OMERO ID whose field name is objectId
-ObjectId = Annotated[
-    OmeroId,
-    Field(validation_alias=AliasChoices("objectId", "object_id"), alias="objectId"),
+CommaSeparatedIds = Annotated[
+    List[OmeroId],
+    BeforeValidator(parse_comma_separated),
 ]
+#: A field whose field name is objectId
+ObjectIdField = Field(
+    validation_alias=AliasChoices("objectId", "object_id"), alias="objectId"
+)
 
 
 class TaskQueueBase(BaseModel):
@@ -82,7 +92,7 @@ class DatasetFields(TaskQueueBase):
     """
 
     name: Annotated[Optional[str], Field(description="Dataset name")] = None
-    object_id: ObjectId = None
+    object_id: Annotated[int | None, ObjectIdField] = None
     description: Annotated[Optional[str], Field(description="Dataset description")] = (
         None
     )
@@ -113,7 +123,7 @@ class ProjectFields(TaskQueueBase):
     """
 
     name: Annotated[Optional[str], Field(description="Project name")] = None
-    object_id: ObjectId = None
+    object_id: Annotated[int | None, ObjectIdField] = None
     description: Annotated[Optional[str], Field(description="Project description")] = (
         None
     )
@@ -256,7 +266,7 @@ class ImportSummary(TaskQueueBase):
         ),
     ]
     image_id: Annotated[
-        OmeroId,
+        OmeroId | CommaSeparatedIds,
         Field(
             alias="imageId",
         ),
@@ -283,7 +293,7 @@ class ImageResponse(ImageRequest):
     import_summary: Annotated[
         Union[ImportSummary, str, None], Field(alias="importSummary")
     ] = None
-    object_id: ObjectId = None
+    object_id: Annotated[int | list[int], ObjectIdField]
     fileset_id: Annotated[OmeroId, Field(alias="filesetId")] = None
     error: Error = None
 
