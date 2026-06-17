@@ -49,7 +49,9 @@ async def test_upload_multi_image(
 ):
     with using_group("Multi Image Abstract Art", connection):
         uploader = Uploader(
-            conn=connection, crate=multi_image_abstract_crate, segmentation_uploader=None
+            conn=connection,
+            crate=multi_image_abstract_crate,
+            segmentation_uploader=None,
         )
         dataset = await uploader.execute()
         permissions = get_dataset_permissions(dataset)
