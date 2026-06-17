@@ -38,6 +38,36 @@ async def test_upload_api(
         check_art_dataset(dataset)
 
 
+@pytest.mark.parametrize(
+    "Uploader", [ApiUploader, pytest.param(TaskqueueUploader, marks=requires_flower)]
+)
+@pytest.mark.asyncio
+async def test_upload_multi_image(
+    multi_image_abstract_crate: Path,
+    connection: BlitzGateway,
+    Uploader: type[OmeroUploader],
+):
+    with using_group("Multi Image Abstract Art", connection):
+        uploader = Uploader(
+            conn=connection,
+            crate=multi_image_abstract_crate,
+            segmentation_uploader=None,
+        )
+        dataset = await uploader.execute()
+        permissions = get_dataset_permissions(dataset)
+        assert str(permissions) == "rwra--"
+        assert dataset.name == "Multi Image Abstract Art"
+        assert dataset.countChildren() == 2
+        assert (
+            dataset.getDetails().getGroup().getName() == "Multi Image Abstract Art"
+        ), "The dataset group should be the crate name"
+        assert {image.name for image in dataset.listChildren()} == {
+            "Color Study. Squares with Concentric Circles",
+            "Accent on rose",
+        }
+        delete_dataset(dataset)
+
+
 class ReadWriteUploader(ApiUploader):
     def get_group_perms(self) -> OmeroPermissions:
         return OmeroPermissions.ReadWrite

@@ -1,0 +1,46 @@
+{
+    "@context": [
+        "https://w3id.org/ro/crate/1.2-DRAFT/context",
+        {
+            "upload": "https://w3id.org/WEHI-SODA-Hub/omerocrate/upload",
+            "segmentationFor": "https://w3id.org/WEHI-SODA-Hub/omerocrate/segmentationFor",
+            "experimenterGroup": "http://www.openmicroscopy.org/Schemas/OME/2016-06/ExperimenterGroupRef"
+        }
+    ],
+    "@graph": [
+        {
+            "@id": "concentric.jpg",
+            "@type": "File",
+            "name": "Color Study. Squares with Concentric Circles",
+            "author": "https://isni.org/isni/0000000121235624",
+            "upload": true
+        },
+        {
+            "@id": "accent-on-rose-1926.jpg",
+            "@type": "File",
+            "name": "Accent on rose",
+            "author": "https://isni.org/isni/0000000121235624",
+            "upload": true
+        },
+        {
+            "@id": "https://isni.org/isni/0000000121235624",
+            "@type": "Person",
+            "name": "Wassily Kandinsky"
+        },
+        {
+            "@type": "CreativeWork",
+            "@id": "ro-crate-metadata.json",
+            "about": {
+                "@id": "./"
+            },
+            "conformsTo": {
+                "@id": "https://w3id.org/ro/crate/1.2-DRAFT"
+            }
+        },
+        {
+            "@id": "./",
+            "@type": "Dataset",
+            "name": "Multi Image Abstract Art"
+        }
+    ]
+}

@@ -16,6 +16,11 @@ def abstract_crate() -> Path:
 
 
 @pytest.fixture
+def multi_image_abstract_crate() -> Path:
+    return Path(__file__).parent / "multi_image_abstract"
+
+
+@pytest.fixture
 def ca_imaging() -> Path:
     out = Path(__file__).parent / "ca-imaging"
     if not out.exists():
