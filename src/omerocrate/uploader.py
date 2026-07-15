@@ -2,11 +2,13 @@ from __future__ import annotations
 import importlib.util
 import logging
 from pathlib import Path
+from time import sleep
 from typing import Any, Iterable, Literal, cast, AsyncIterable
 from rdflib import Graph, URIRef
 from rdflib.query import ResultRow
 from rdflib.term import Identifier
 from functools import cached_property
+import omero
 from omero import model, gateway, grid, cmd
 from omero.model import enums
 from omero.rtypes import rstring, rbool
@@ -441,12 +443,29 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """,
             variables={"file_path": uri},
         )
-        if (description := result.description) is not None:
-            image.setDescription(str(description))
-        if (name := result.name) is not None:
-            image.setName(str(name))
+        if result.name is None and result.description is None:
+            # Nothing to update, so avoid an unnecessary save
+            return
 
-        image.save()
+        attempts = 3
+        for attempt in range(1, attempts + 1):
+            image = self.conn.getObject("Image", image.getId())
+            if (description := result.description) is not None:
+                image.setDescription(str(description))
+            if (name := result.name) is not None:
+                image.setName(str(name))
+            try:
+                image.save()
+                return
+            # If the image was modified by another process, refetch and retry
+            except omero.OptimisticLockException:
+                if attempt == attempts:
+                    raise
+                logger.warning(
+                    f"Conflicting update while saving image {image.getId()} "
+                    f"(attempt {attempt}/{attempts}), refetching and retrying"
+                )
+                sleep(1)
 
     def get_group_name(self) -> str:
         """
