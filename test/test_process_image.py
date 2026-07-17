@@ -26,7 +26,7 @@ def uploader(tmp_path: Path) -> OmeroUploader:
 @pytest.fixture(autouse=True)
 def instant_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     """Run tests instantly."""
-    monkeypatch.setattr("omerocrate.uploader.sleep", lambda seconds: None)
+    monkeypatch.setattr("tenacity.nap.time.sleep", lambda seconds: None)
 
 
 @pytest.fixture
