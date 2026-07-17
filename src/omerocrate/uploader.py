@@ -7,7 +7,6 @@ from rdflib import Graph, URIRef
 from rdflib.query import ResultRow
 from rdflib.term import Identifier
 from functools import cached_property
-import omero
 from omero import model, gateway, grid, cmd
 from omero.model import enums
 from omero.rtypes import rstring, rbool
@@ -689,8 +688,8 @@ class ApiUploader(OmeroUploader):
                     handles.remove(handle)
                     pixels: model.PixelsI
                     for pixels in response.pixels:
-                        wrapper = gateway.ImageWrapper(
-                            conn=self.conn, obj=pixels.getImage()
+                        wrapper = self.conn.getObject(
+                            "Image", pixels.getImage().getId().getValue()
                         )
                         # Add the image to the dataset
                         dataset._linkObject(wrapper, "DatasetImageLinkI")
