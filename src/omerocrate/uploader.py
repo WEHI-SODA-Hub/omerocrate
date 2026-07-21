@@ -16,6 +16,7 @@ from pydantic import BaseModel, model_validator
 from enum import Enum
 
 from omerocrate.utils import uri_to_path, user_in_group
+from omerocrate.retry import retry_omero_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -441,11 +442,36 @@ class OmeroUploader(BaseModel, arbitrary_types_allowed=True):
         """,
             variables={"file_path": uri},
         )
-        if (description := result.description) is not None:
-            image.setDescription(str(description))
-        if (name := result.name) is not None:
-            image.setName(str(name))
+        if result.name is None and result.description is None:
+            # Nothing to update, so avoid an unnecessary save
+            return
 
+        self.save_image_metadata(
+            image.getId(),
+            name=str(result.name) if result.name is not None else None,
+            description=str(result.description)
+            if result.description is not None
+            else None,
+        )
+
+    @retry_omero_conflict
+    def save_image_metadata(
+        self, image_id: int, *, name: str | None = None, description: str | None = None
+    ) -> None:
+        """
+        Sets name/description on a freshly fetched copy of the image, retrying on
+        OptimisticLockException.
+
+        Args:
+            image_id: The ID of the image to update.
+            name: The new name for the image, or None to leave unchanged.
+            description: The new description for the image, or None to leave unchanged.
+        """
+        image = self.conn.getObject("Image", image_id)
+        if name is not None:
+            image.setName(name)
+        if description is not None:
+            image.setDescription(description)
         image.save()
 
     def get_group_name(self) -> str:
@@ -662,8 +688,8 @@ class ApiUploader(OmeroUploader):
                     handles.remove(handle)
                     pixels: model.PixelsI
                     for pixels in response.pixels:
-                        wrapper = gateway.ImageWrapper(
-                            conn=self.conn, obj=pixels.getImage()
+                        wrapper = self.conn.getObject(
+                            "Image", pixels.getImage().getId().getValue()
                         )
                         # Add the image to the dataset
                         dataset._linkObject(wrapper, "DatasetImageLinkI")
